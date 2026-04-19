@@ -65,7 +65,7 @@ def lambda_handler(event, _):
     return {"statusCode": status, "body": body, "headers": headers}
 
 
-def handle_feed_request(channel_name: str, key: Optional[str]):
+def handle_feed_request(channel_name: str, key: Optional[str]) -> tuple[int, str, dict[str, str]]:
     """Shared request handling for Lambda and Docker HTTP server."""
     headers = {"Content-Type": "text/plain; charset=UTF-8"}
 
@@ -305,7 +305,7 @@ def escape_attr(s: str) -> str:
 class RssRequestHandler(BaseHTTPRequestHandler):
     """Minimal HTTP API for running outside AWS Lambda."""
 
-    def do_GET(self):
+    def do_GET(self) -> None:
         parsed = urlparse(self.path)
         if not parsed.path.startswith(FEED_PATH_PREFIX):
             self._write_response(404, "Not Found", {"Content-Type": "text/plain; charset=UTF-8"})
@@ -316,7 +316,7 @@ class RssRequestHandler(BaseHTTPRequestHandler):
         status, body, headers = handle_feed_request(channel_name, key)
         self._write_response(status, body, headers)
 
-    def _write_response(self, status: int, body: str, headers: dict):
+    def _write_response(self, status: int, body: str, headers: dict[str, str]) -> None:
         payload = body.encode("utf-8")
         self.send_response(status)
         for k, v in headers.items():
@@ -325,12 +325,12 @@ class RssRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
-    def log_message(self, fmt, *args):
+    def log_message(self, fmt: str, *args) -> None:
         """Keep default request logging with a stable format."""
         super().log_message(fmt, *args)
 
 
-def run_server():
+def run_server() -> None:
     """Run HTTP server for Docker deployment."""
     host = os.environ.get("HOST", "0.0.0.0")
     try:
