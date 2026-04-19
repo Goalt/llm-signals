@@ -19,7 +19,8 @@ HEADERS = {
 TIMEOUT = 30
 URL_RE = re.compile(r'(https?://[^\s<>"\']+)')
 BG_URL_RE = re.compile(r"background-image:\s*url\(['\"]?(?P<u>[^'\")]+)['\"]?\)", re.IGNORECASE)
-CHANNEL_RE = re.compile(r"^[A-Za-z0-9_]{5,}$")
+CHANNEL_NAME_RE = re.compile(r"^[A-Za-z0-9_]{5,}$")
+FEED_PATH_PREFIX = "/feed/"
 
 
 def autolink_plain(text: str) -> str:
@@ -74,7 +75,7 @@ def handle_feed_request(channel_name: str, key: Optional[str]):
         return 401, "Unauthorized", headers
     if not channel_name:
         return 400, "Missing channel_name", headers
-    if not CHANNEL_RE.fullmatch(channel_name):
+    if not CHANNEL_NAME_RE.fullmatch(channel_name):
         return 400, "Invalid channel_name", headers
 
     try:
@@ -305,11 +306,11 @@ class RssRequestHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
-        if not parsed.path.startswith("/feed/"):
+        if not parsed.path.startswith(FEED_PATH_PREFIX):
             self._write_response(404, "Not Found", {"Content-Type": "text/plain; charset=UTF-8"})
             return
 
-        channel_name = unquote(parsed.path[len("/feed/") :]).strip("/")
+        channel_name = unquote(parsed.path[len(FEED_PATH_PREFIX) :]).strip("/")
         key = parse_qs(parsed.query).get("key", [None])[0]
         status, body, headers = handle_feed_request(channel_name, key)
         self._write_response(status, body, headers)
