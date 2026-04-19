@@ -4,7 +4,9 @@ from datetime import datetime
 from typing import Optional, List
 import os
 import re
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urljoin
+from urllib.parse import parse_qs, unquote, urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -17,6 +19,9 @@ HEADERS = {
 TIMEOUT = 30
 URL_RE = re.compile(r'(https?://[^\s<>"\']+)')
 BG_URL_RE = re.compile(r"background-image:\s*url\(['\"]?(?P<u>[^'\")]+)['\"]?\)", re.IGNORECASE)
+# Telegram public channel usernames are 5-32 chars: letters, numbers, underscores.
+CHANNEL_NAME_RE = re.compile(r"^[A-Za-z0-9_]{5,32}$")
+FEED_PATH_PREFIX = "/feed/"
 
 
 def autolink_plain(text: str) -> str:
@@ -54,22 +59,36 @@ class ContentEncoded(Extension):
 
 def lambda_handler(event, _):
     """AWS Lambda entrypoint."""
-    if not event.get("queryStringParameters") or event["queryStringParameters"].get("key") != os.environ["API_KEY"]:
-        return {"statusCode": 401, "body": "Unauthorized"}
+    channel_name = ((event.get("pathParameters") or {}).get("channel_name") or "").strip()
+    key = (event.get("queryStringParameters") or {}).get("key")
+    status, body, headers = handle_feed_request(channel_name, key)
+    return {"statusCode": status, "body": body, "headers": headers}
+
+
+def handle_feed_request(channel_name: str, key: Optional[str]) -> tuple[int, str, dict[str, str]]:
+    """Shared request handling for Lambda and Docker HTTP server."""
+    headers = {"Content-Type": "text/plain; charset=UTF-8"}
+
+    expected_key = os.environ.get("API_KEY", "")
+    if not expected_key:
+        return 500, "Server configuration error", headers
+    if key != expected_key:
+        return 401, "Unauthorized", headers
+    if not channel_name:
+        return 400, "Missing channel_name", headers
+    if not CHANNEL_NAME_RE.fullmatch(channel_name):
+        return 400, "Invalid channel_name", headers
 
     try:
-        channel = event["pathParameters"]["channel_name"]
-        rss_xml = get_rss_feed(channel)
-        return {
-            "statusCode": 200,
-            "body": rss_xml,
-            "headers": {
-                "Content-Type": "application/rss+xml; charset=UTF-8",
-                "Cache-Control": "max-age=60, public",
-            },
-        }
+        rss_xml = get_rss_feed(channel_name)
     except Exception as ex:
-        return {"statusCode": 400, "body": str(ex)}
+        return 400, str(ex), headers
+
+    headers = {
+        "Content-Type": "application/rss+xml; charset=UTF-8",
+        "Cache-Control": "max-age=60, public",
+    }
+    return 200, rss_xml, headers
 
 
 def get_rss_feed(channel_name: str) -> str:
@@ -281,3 +300,47 @@ def guess_mime(url: str) -> str:
 def escape_attr(s: str) -> str:
     """Escape double quotes in attribute values for safe HTML attribute usage."""
     return s.replace('"', "&quot;")
+
+
+class RssRequestHandler(BaseHTTPRequestHandler):
+    """Minimal HTTP API for running outside AWS Lambda."""
+
+    def do_GET(self) -> None:
+        parsed = urlparse(self.path)
+        if not parsed.path.startswith(FEED_PATH_PREFIX):
+            self._write_response(404, "Not Found", {"Content-Type": "text/plain; charset=UTF-8"})
+            return
+
+        channel_name = unquote(parsed.path.removeprefix(FEED_PATH_PREFIX)).rstrip("/")
+        key = parse_qs(parsed.query).get("key", [None])[0]
+        status, body, headers = handle_feed_request(channel_name, key)
+        self._write_response(status, body, headers)
+
+    def _write_response(self, status: int, body: str, headers: dict[str, str]) -> None:
+        payload = body.encode("utf-8")
+        self.send_response(status)
+        for k, v in headers.items():
+            self.send_header(k, v)
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def log_message(self, fmt: str, *args) -> None:
+        """Keep default request logging with a stable format."""
+        super().log_message(fmt, *args)
+
+
+def run_server() -> None:
+    """Run HTTP server for Docker deployment."""
+    host = os.environ.get("HOST", "0.0.0.0")
+    port_value = os.environ.get("PORT", "8000")
+    if not port_value.isdigit():
+        raise ValueError(f'Invalid PORT value "{port_value}": must be an integer')
+    port = int(port_value)
+    server = ThreadingHTTPServer((host, port), RssRequestHandler)
+    print(f"Serving tg-channel-to-rss on http://{host}:{port}")
+    server.serve_forever()
+
+
+if __name__ == "__main__":
+    run_server()

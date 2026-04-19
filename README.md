@@ -1,8 +1,8 @@
 # tg-channel-to-rss
-AWS Lambda function for converting a **public Telegram channel** into an **RSS feed**.
+Dockerized service (with AWS Lambda-compatible handler) for converting a **public Telegram channel** into an **RSS feed**.
 
 ## How it works
-1. The Lambda receives requests via API Gateway:
+1. The service receives HTTP requests:
    `GET /feed/{channel_name}?key={api_key}`
 2. It fetches the public static view of the channel at
    `https://t.me/s/{channel_name}`.
@@ -19,19 +19,26 @@ AWS Lambda function for converting a **public Telegram channel** into an **RSS f
 
 ## Requirements
 - Python 3.13 or higher
-- AWS SAM (Serverless Application Model)
+- Docker
 
-## Build and deploy
-1. Set your API key: edit `samconfig.yaml` or pass `--parameter-overrides ApiKey=YOUR_KEY`.
-2. Build and deploy:
+## Build and run with Docker
+1. Build image:
 ```bash
-sam build
-sam deploy --guided
+docker build -t tg-channel-to-rss .
+```
+2. Run container:
+```bash
+docker run --rm -p 8000:8000 -e API_KEY=YOUR_KEY tg-channel-to-rss
 ```
 
 ## Usage
 Call the endpoint with the channel name and your API key:
 ```bash
-curl 'https://<api-gateway-url>/feed/cool_telegram_channel?key=test'
+curl 'http://localhost:8000/feed/cool_telegram_channel?key=YOUR_KEY'
 ```
 This returns an RSS XML feed of the channel’s recent posts, including text and photo previews, ready to import into your RSS reader.
+
+## Optional environment variables
+- `API_KEY` (required): shared key for request authentication.
+- `PORT` (optional, default `8000`): HTTP listening port inside the container.
+- `HOST` (optional, default `0.0.0.0`): HTTP bind address.
