@@ -6,7 +6,7 @@ import os
 import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urljoin
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import unquote, urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -60,20 +60,14 @@ class ContentEncoded(Extension):
 def lambda_handler(event, _):
     """AWS Lambda entrypoint."""
     channel_name = ((event.get("pathParameters") or {}).get("channel_name") or "").strip()
-    key = (event.get("queryStringParameters") or {}).get("key")
-    status, body, headers = handle_feed_request(channel_name, key)
+    status, body, headers = handle_feed_request(channel_name)
     return {"statusCode": status, "body": body, "headers": headers}
 
 
-def handle_feed_request(channel_name: str, key: Optional[str]) -> tuple[int, str, dict[str, str]]:
+def handle_feed_request(channel_name: str) -> tuple[int, str, dict[str, str]]:
     """Shared request handling for Lambda and Docker HTTP server."""
     headers = {"Content-Type": "text/plain; charset=UTF-8"}
 
-    expected_key = os.environ.get("API_KEY", "")
-    if not expected_key:
-        return 500, "Server configuration error", headers
-    if key != expected_key:
-        return 401, "Unauthorized", headers
     if not channel_name:
         return 400, "Missing channel_name", headers
     if not CHANNEL_NAME_RE.fullmatch(channel_name):
@@ -312,8 +306,7 @@ class RssRequestHandler(BaseHTTPRequestHandler):
             return
 
         channel_name = unquote(parsed.path.removeprefix(FEED_PATH_PREFIX)).rstrip("/")
-        key = parse_qs(parsed.query).get("key", [None])[0]
-        status, body, headers = handle_feed_request(channel_name, key)
+        status, body, headers = handle_feed_request(channel_name)
         self._write_response(status, body, headers)
 
     def _write_response(self, status: int, body: str, headers: dict[str, str]) -> None:

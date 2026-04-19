@@ -3,7 +3,7 @@ Dockerized service (with AWS Lambda-compatible handler) for converting a **publi
 
 ## How it works
 1. The service receives HTTP requests:
-   `GET /feed/{channel_name}?key={api_key}`
+   `GET /feed/{channel_name}`
 2. It fetches the public static view of the channel at
    `https://t.me/s/{channel_name}`.
 3. Using **BeautifulSoup**, it parses each Telegram message bubble, extracts:
@@ -28,17 +28,16 @@ docker build -t tg-channel-to-rss .
 ```
 2. Run container:
 ```bash
-docker run --rm -p 8000:8000 -e API_KEY=YOUR_KEY tg-channel-to-rss
+docker run --rm -p 8000:8000 tg-channel-to-rss
 ```
 
 ## Usage
-Call the endpoint with the channel name and your API key:
+Call the endpoint with the channel name:
 ```bash
-curl 'http://localhost:8000/feed/cool_telegram_channel?key=YOUR_KEY'
+curl 'http://localhost:8000/feed/cool_telegram_channel'
 ```
 This returns an RSS XML feed of the channel’s recent posts, including text and photo previews, ready to import into your RSS reader.
 
 ## Optional environment variables
-- `API_KEY` (required): shared key for request authentication.
 - `PORT` (optional, default `8000`): HTTP listening port inside the container.
 - `HOST` (optional, default `0.0.0.0`): HTTP bind address.
