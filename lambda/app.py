@@ -71,7 +71,7 @@ def handle_feed_request(channel_name: str, key: Optional[str]) -> tuple[int, str
 
     expected_key = os.environ.get("API_KEY", "")
     if not expected_key:
-        return 500, "Server configuration error: API_KEY environment variable not set", headers
+        return 500, "Server configuration error", headers
     if key != expected_key:
         return 401, "Unauthorized", headers
     if not channel_name:
@@ -333,10 +333,10 @@ class RssRequestHandler(BaseHTTPRequestHandler):
 def run_server() -> None:
     """Run HTTP server for Docker deployment."""
     host = os.environ.get("HOST", "0.0.0.0")
-    try:
-        port = int(os.environ.get("PORT", "8000"))
-    except ValueError as ex:
-        raise ValueError("Invalid PORT value: must be an integer") from ex
+    port_value = os.environ.get("PORT", "8000")
+    if not port_value.isdigit():
+        raise ValueError("Invalid PORT value: must be an integer")
+    port = int(port_value)
     server = ThreadingHTTPServer((host, port), RssRequestHandler)
     print(f"Serving tg-channel-to-rss on http://{host}:{port}")
     server.serve_forever()
