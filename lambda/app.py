@@ -19,7 +19,7 @@ HEADERS = {
 TIMEOUT = 30
 URL_RE = re.compile(r'(https?://[^\s<>"\']+)')
 BG_URL_RE = re.compile(r"background-image:\s*url\(['\"]?(?P<u>[^'\")]+)['\"]?\)", re.IGNORECASE)
-CHANNEL_NAME_RE = re.compile(r"^[A-Za-z0-9_]{5,}$")
+CHANNEL_NAME_RE = re.compile(r"^[A-Za-z0-9_]{5,32}$")
 FEED_PATH_PREFIX = "/feed/"
 
 
@@ -310,7 +310,7 @@ class RssRequestHandler(BaseHTTPRequestHandler):
             self._write_response(404, "Not Found", {"Content-Type": "text/plain; charset=UTF-8"})
             return
 
-        channel_name = unquote(parsed.path[len(FEED_PATH_PREFIX) :]).strip("/")
+        channel_name = unquote(parsed.path[len(FEED_PATH_PREFIX) :]).rstrip("/")
         key = parse_qs(parsed.query).get("key", [None])[0]
         status, body, headers = handle_feed_request(channel_name, key)
         self._write_response(status, body, headers)
