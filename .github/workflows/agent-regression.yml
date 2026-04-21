@@ -1,0 +1,186 @@
+name: agent-regression
+
+# Regression suite aligned with .github/agents/api-integrator.agent.md
+# Runs the same 7-layer protocol used by the API Integrator agent.
+#
+# Layers executed in CI:
+#   1. Static checks       (go build, go vet)
+#   2. Colocated unit tests (go test ./... excluding tests/ and tests/manual/...)
+#   3. Cross-module black-box tests (go test ./tests/...)
+#   4. E2E tests            (go test -tags=e2e ./...) — self-skip when creds are absent
+#   5. Manual HTTP regression (starts server, replays tests/manual/run.sh)
+#   6. Notifier regression  (e2e driver + wiring script)
+#   7. Final gate           (summary table in job summary)
+#
+# Credentials-gated layers (4, optionally 6) read from repository secrets.
+# Add them under Settings → Secrets and variables → Actions to enable.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: 7-layer regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      # Layer 5 expects the server on :8000. HOST / LOG are consumed by tests/manual/run.sh.
+      HOST: http://localhost:8000
+      LOG: tests/manual/run.log
+      # Layer 4 e2e credentials (optional — tests self-skip when empty).
+      XAPI_AUTHORIZATION: ${{ secrets.XAPI_AUTHORIZATION }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install test dependencies
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends jq curl
+
+      # ------------------------------------------------------------------
+      # Layer 1 — static checks
+      # ------------------------------------------------------------------
+      - name: Layer 1 — static checks (build + vet)
+        id: layer1
+        run: |
+          set -e
+          go build ./...
+          go vet ./...
+          echo "result=✅ PASS" >> "$GITHUB_OUTPUT"
+
+      # ------------------------------------------------------------------
+      # Layer 2 — colocated unit tests
+      # ------------------------------------------------------------------
+      - name: Layer 2 — colocated unit tests
+        id: layer2
+        run: |
+          set -e
+          go test ./cmd/... ./internal/... -count=1
+          echo "result=✅ PASS" >> "$GITHUB_OUTPUT"
+
+      # ------------------------------------------------------------------
+      # Layer 3 — cross-module black-box tests
+      # ------------------------------------------------------------------
+      - name: Layer 3 — cross-module black-box tests
+        id: layer3
+        run: |
+          set -e
+          go vet ./tests/...
+          go test ./tests/... -count=1
+          echo "result=✅ PASS" >> "$GITHUB_OUTPUT"
+
+      # ------------------------------------------------------------------
+      # Layer 4 — credentials-gated e2e
+      # Tests gate themselves via t.Skip when env vars are empty, so CI runs
+      # them unconditionally and reports SKIP when secrets are absent.
+      # ------------------------------------------------------------------
+      - name: Layer 4 — e2e tests (credentials-gated)
+        id: layer4
+        run: |
+          set -e
+          go test -tags=e2e ./... -count=1 -v | tee /tmp/e2e.log
+          if grep -Eq "^--- SKIP" /tmp/e2e.log && ! grep -Eq "^--- FAIL" /tmp/e2e.log; then
+            echo "result=⏭ SKIP (no credentials provided)" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=✅ PASS" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ------------------------------------------------------------------
+      # Layer 5 — manual HTTP regression
+      # NOTE: Layer 5 hits real upstreams (Telegram, Hyperliquid, Polymarket,
+      # Bybit). Failures may reflect upstream flakiness; keep continue-on-error
+      # until the script learns to retry.
+      # ------------------------------------------------------------------
+      - name: Layer 5a — start server
+        run: |
+          go build -o /tmp/tg-server ./cmd/server
+          /tmp/tg-server > /tmp/server.log 2>&1 &
+          echo $! > /tmp/server.pid
+          for i in $(seq 1 20); do
+            if curl -fsS -o /dev/null "$HOST/" 2>/dev/null || \
+               curl -fsS -o /dev/null "$HOST/feed/durov" 2>/dev/null; then
+              break
+            fi
+            sleep 0.5
+          done
+
+      - name: Layer 5b — replay HTTP regression
+        id: layer5
+        continue-on-error: true
+        run: |
+          set -e
+          bash tests/manual/run.sh
+          echo "result=✅ PASS" >> "$GITHUB_OUTPUT"
+
+      - name: Layer 5c — stop server
+        if: always()
+        run: |
+          if [ -f /tmp/server.pid ]; then
+            kill "$(cat /tmp/server.pid)" 2>/dev/null || true
+          fi
+
+      # ------------------------------------------------------------------
+      # Layer 6 — notifier regression
+      # ------------------------------------------------------------------
+      - name: Layer 6a — notifier e2e
+        id: layer6a
+        run: |
+          set -e
+          go build -o /tmp/notifier-e2e ./tests/manual/notifier_e2e
+          /tmp/notifier-e2e
+          echo "result=✅ PASS" >> "$GITHUB_OUTPUT"
+
+      - name: Layer 6b — notifier wiring
+        id: layer6b
+        run: |
+          set -e
+          bash tests/manual/notifier-wiring.sh
+          echo "result=✅ PASS" >> "$GITHUB_OUTPUT"
+
+      # ------------------------------------------------------------------
+      # Layer 7 — final gate / job summary
+      # ------------------------------------------------------------------
+      - name: Layer 7 — summary
+        if: always()
+        run: |
+          {
+            echo "## 7-layer regression summary"
+            echo ""
+            echo "| Layer | Command | Result |"
+            echo "|---|---|---|"
+            echo "| 1. Static checks | \`go build ./... && go vet ./...\` | ${{ steps.layer1.outputs.result || '❌ FAIL' }} |"
+            echo "| 2. Colocated unit tests | \`go test ./cmd/... ./internal/... -count=1\` | ${{ steps.layer2.outputs.result || '❌ FAIL' }} |"
+            echo "| 3. Cross-module black-box | \`go test ./tests/... -count=1\` | ${{ steps.layer3.outputs.result || '❌ FAIL' }} |"
+            echo "| 4. E2E (credentials-gated) | \`go test -tags=e2e ./... -count=1\` | ${{ steps.layer4.outputs.result || '❌ FAIL' }} |"
+            echo "| 5. Manual HTTP regression | \`bash tests/manual/run.sh\` | ${{ steps.layer5.outputs.result || '❌ FAIL (upstream?)' }} |"
+            echo "| 6a. Notifier e2e | \`/tmp/notifier-e2e\` | ${{ steps.layer6a.outputs.result || '❌ FAIL' }} |"
+            echo "| 6b. Notifier wiring | \`bash tests/manual/notifier-wiring.sh\` | ${{ steps.layer6b.outputs.result || '❌ FAIL' }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload regression logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-logs
+          path: |
+            tests/manual/run.log
+            tests/manual/notifier.log
+            tests/manual/notifier-wiring.log
+            /tmp/server.log
+            /tmp/e2e.log
+          if-no-files-found: ignore
+          retention-days: 7

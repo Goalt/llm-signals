@@ -36,6 +36,9 @@ func TestGetJSONFeedSuccess(t *testing.T) {
     <meta property="og:description" content="Test Description" />
   </head>
   <body>
+    <div class="tgme_channel_info">
+      <div class="tgme_channel_info_header_title">Test Channel</div>
+    </div>
     <div class="tgme_widget_message_bubble">
       <a class="tgme_widget_message_date" href="https://t.me/testch1/123">date</a>
       <time class="time" datetime="2026-04-21T10:00:00+00:00"></time>
@@ -81,6 +84,35 @@ func TestGetJSONFeedChannelNotFound(t *testing.T) {
 	_, err := svc.GetJSONFeed("testch1")
 	if err == nil || err.Error() != "Telegram channel not found" {
 		t.Fatalf("expected Telegram channel not found error, got %v", err)
+	}
+}
+
+func TestGetJSONFeedChannelNotFoundContactPage(t *testing.T) {
+	// Telegram returns HTTP 200 for non-existent channels with a "Contact @..." page
+	// The key difference is the absence of .tgme_channel_info div
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`<!DOCTYPE html>
+<html>
+<head>
+	<title>Telegram: Contact @nonexistent</title>
+	<meta property="og:description" content="Contact @nonexistent on Telegram">
+</head>
+<body>
+	<div class="tgme_page">
+		<div class="tgme_page_description">Contact @nonexistent on Telegram</div>
+	</div>
+</body>
+</html>`))
+	}))
+	defer server.Close()
+
+	svc := NewService(server.Client())
+	svc.BaseURL = server.URL
+
+	_, err := svc.GetJSONFeed("nonexistent")
+	if err == nil || err.Error() != "Telegram channel not found" {
+		t.Fatalf("expected Telegram channel not found error for contact page, got %v", err)
 	}
 }
 

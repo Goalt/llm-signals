@@ -18,6 +18,7 @@ func sampleChannelHTML(channel string, n int) string {
 	var b strings.Builder
 	b.WriteString(`<html><head><title>` + channel + ` channel</title>`)
 	b.WriteString(`<meta property="og:description" content="desc of ` + channel + `"/></head><body>`)
+	b.WriteString(`<div class="tgme_channel_info"><div class="tgme_channel_info_header_title">` + channel + `</div></div>`)
 	for i := 1; i <= n; i++ {
 		id := strconv.Itoa(i)
 		b.WriteString(`<div class="tgme_widget_message_bubble">`)
@@ -122,6 +123,35 @@ func TestApp_GetJSONFeed_ChannelNotFound(t *testing.T) {
 	}
 }
 
+func TestApp_GetJSONFeed_ChannelNotFoundContactPage(t *testing.T) {
+	// Telegram returns HTTP 200 with "Contact @..." page for non-existent channels
+	// The key difference is the absence of .tgme_channel_info div
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`<!DOCTYPE html>
+<html>
+<head>
+	<title>Telegram: Contact @nonexistentchannel123</title>
+	<meta property="og:description" content="Contact @nonexistentchannel123 on Telegram">
+</head>
+<body>
+	<div class="tgme_page">
+		<div class="tgme_page_description">Contact @nonexistentchannel123 on Telegram</div>
+	</div>
+</body>
+</html>`))
+	}))
+	defer server.Close()
+
+	svc := app.NewService(server.Client())
+	svc.BaseURL = server.URL
+
+	if _, err := svc.GetJSONFeed("nonexistentchannel123"); err == nil ||
+		!strings.Contains(err.Error(), "Telegram channel not found") {
+		t.Fatalf("expected not-found error for contact page, got %v", err)
+	}
+}
+
 func TestApp_GetJSONFeed_NetworkError(t *testing.T) {
 	// Point at a closed server so the HTTP client errors out immediately.
 	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
@@ -138,7 +168,7 @@ func TestApp_GetJSONFeed_NetworkError(t *testing.T) {
 
 func TestApp_GetJSONFeed_EmptyChannel(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`<html><head><title>empty</title></head><body></body></html>`))
+		_, _ = w.Write([]byte(`<html><head><title>empty</title></head><body><div class="tgme_channel_info"></div></body></html>`))
 	}))
 	defer server.Close()
 
@@ -166,6 +196,7 @@ func TestApp_GetJSONFeed_SkipsReactionImages(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`
 <html><head><title>c</title></head><body>
+  <div class="tgme_channel_info"></div>
   <div class="tgme_widget_message_bubble">
     <a class="tgme_widget_message_date" href="https://t.me/chanx/1">d</a>
     <div class="tgme_widget_message_text">hi</div>

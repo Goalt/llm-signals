@@ -88,6 +88,13 @@ func (s *Service) GetJSONFeed(channelName string) (string, error) {
 		return "", err
 	}
 
+	// Check if this is a "Contact @..." page (non-existent channel)
+	// Telegram returns 200 for non-existent channels without .tgme_channel_info div
+	hasChannelInfo := doc.Find("div.tgme_channel_info").Length() > 0
+	if !hasChannelInfo {
+		return "", fmt.Errorf("Telegram channel not found")
+	}
+
 	title := channelName
 	if doc.Find("title").First().Length() > 0 {
 		if t := strings.TrimSpace(doc.Find("title").First().Text()); t != "" {

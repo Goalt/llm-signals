@@ -1,10 +1,10 @@
 === feed missing
 $ curl -sS -X GET 'http://localhost:8000/feed/' 
-HTTP 400  time=0.000411s  size=20B
+HTTP 400  time=0.000809s  size=20B
 --- response headers:
 HTTP/1.1 400 Bad Request
 Content-Type: text/plain; charset=UTF-8
-Date: Tue, 21 Apr 2026 20:30:59 GMT
+Date: Tue, 21 Apr 2026 20:44:00 GMT
 Content-Length: 20
 
 --- response body (first 400B):
@@ -12,11 +12,11 @@ Missing channel_name
 
 === feed short
 $ curl -sS -X GET 'http://localhost:8000/feed/ab' 
-HTTP 400  time=0.000438s  size=20B
+HTTP 400  time=0.000428s  size=20B
 --- response headers:
 HTTP/1.1 400 Bad Request
 Content-Type: text/plain; charset=UTF-8
-Date: Tue, 21 Apr 2026 20:30:59 GMT
+Date: Tue, 21 Apr 2026 20:44:00 GMT
 Content-Length: 20
 
 --- response body (first 400B):
@@ -24,11 +24,11 @@ Invalid channel_name
 
 === feed bad chars
 $ curl -sS -X GET 'http://localhost:8000/feed/hello-world' 
-HTTP 400  time=0.000377s  size=20B
+HTTP 400  time=0.000385s  size=20B
 --- response headers:
 HTTP/1.1 400 Bad Request
 Content-Type: text/plain; charset=UTF-8
-Date: Tue, 21 Apr 2026 20:30:59 GMT
+Date: Tue, 21 Apr 2026 20:44:00 GMT
 Content-Length: 20
 
 --- response body (first 400B):
@@ -36,11 +36,11 @@ Invalid channel_name
 
 === feed 33 chars
 $ curl -sS -X GET 'http://localhost:8000/feed/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' 
-HTTP 400  time=0.000422s  size=20B
+HTTP 400  time=0.000362s  size=20B
 --- response headers:
 HTTP/1.1 400 Bad Request
 Content-Type: text/plain; charset=UTF-8
-Date: Tue, 21 Apr 2026 20:30:59 GMT
+Date: Tue, 21 Apr 2026 20:44:00 GMT
 Content-Length: 20
 
 --- response body (first 400B):
@@ -48,25 +48,25 @@ Invalid channel_name
 
 === feed not found
 $ curl -sS -X GET 'http://localhost:8000/feed/this_channel_does_not_exist_0001' 
-HTTP 200  time=0.046951s  size=253B
+HTTP 200  time=0.057220s  size=253B
 --- response headers:
 HTTP/1.1 200 OK
 Cache-Control: max-age=60, public
 Content-Type: application/json; charset=UTF-8
-Date: Tue, 21 Apr 2026 20:30:59 GMT
+Date: Tue, 21 Apr 2026 20:44:00 GMT
 Content-Length: 253
 
 --- response body (first 400B):
-{"title":"Telegram: Contact @this_channel_does_not_exist_0001","link":"https://t.me/s/this_channel_does_not_exist_0001","description":"Posts from Telegram: Contact @this_channel_does_not_exist_0001","created":"2026-04-21T20:30:59.639400093Z","items":[]}
+{"title":"Telegram: Contact @this_channel_does_not_exist_0001","link":"https://t.me/s/this_channel_does_not_exist_0001","description":"Posts from Telegram: Contact @this_channel_does_not_exist_0001","created":"2026-04-21T20:44:00.866829695Z","items":[]}
 
 === unknown path
 $ curl -sS -X GET 'http://localhost:8000/unknown' 
-HTTP 404  time=0.000375s  size=10B
+HTTP 404  time=0.000557s  size=10B
 --- response headers:
 HTTP/1.1 404 Not Found
 Content-Type: text/plain; charset=utf-8
 X-Content-Type-Options: nosniff
-Date: Tue, 21 Apr 2026 20:30:59 GMT
+Date: Tue, 21 Apr 2026 20:44:00 GMT
 Content-Length: 10
 
 --- response body (first 400B):
@@ -75,198 +75,198 @@ Not Found
 
 === feed ok durov
 $ curl -sS -X GET 'http://localhost:8000/feed/durov' 
-HTTP 200  time=0.109675s  size=66225B
+HTTP 200  time=0.190573s  size=66225B
 --- response headers:
 HTTP/1.1 200 OK
 Cache-Control: max-age=60, public
 Content-Type: application/json; charset=UTF-8
-Date: Tue, 21 Apr 2026 20:30:59 GMT
+Date: Tue, 21 Apr 2026 20:44:01 GMT
 Transfer-Encoding: chunked
 
 --- response body (first 400B):
-{"title":"Pavel Durov – Telegram","link":"https://t.me/s/durov","description":"Founder of Telegram.","created":"2026-04-21T20:30:59.770562498Z","items":[{"title":"New post in channel @durov","description":"\u003cp\u003e💸 Telegram has fully repaid the bonds we issued 5 years ago. 🎆💰 Since 2021, we’ve built an innovative monetization strategy and reached profitability in 2024. As a resu
+{"title":"Pavel Durov – Telegram","link":"https://t.me/s/durov","description":"Founder of Telegram.","created":"2026-04-21T20:44:01.093815726Z","items":[{"title":"New post in channel @durov","description":"\u003cp\u003e💸 Telegram has fully repaid the bonds we issued 5 years ago. 🎆💰 Since 2021, we’ve built an innovative monetization strategy and reached profitability in 2024. As a resu
 
 === feed ok telegram
 $ curl -sS -X GET 'http://localhost:8000/feed/telegram' 
-HTTP 200  time=0.110839s  size=72353B
+HTTP 200  time=0.104478s  size=72353B
 --- response headers:
 HTTP/1.1 200 OK
 Cache-Control: max-age=60, public
 Content-Type: application/json; charset=UTF-8
-Date: Tue, 21 Apr 2026 20:30:59 GMT
+Date: Tue, 21 Apr 2026 20:44:01 GMT
 Transfer-Encoding: chunked
 
 --- response body (first 400B):
-{"title":"Telegram News – Telegram","link":"https://t.me/s/telegram","description":"The official Telegram on Telegram. Much recursion. Very Telegram. Wow.","created":"2026-04-21T20:30:59.887773783Z","items":[{"title":"New post in channel @telegram","description":"\u003cp\u003eProfile Audio in Stories. When posting a story, you can now quickly add audio from your profile playlist.December Feature
+{"title":"Telegram News – Telegram","link":"https://t.me/s/telegram","description":"The official Telegram on Telegram. Much recursion. Very Telegram. Wow.","created":"2026-04-21T20:44:01.210703899Z","items":[{"title":"New post in channel @telegram","description":"\u003cp\u003eProfile Audio in Stories. When posting a story, you can now quickly add audio from your profile playlist.December Feature
 
 === hl info meta
 $ curl -sS -X POST 'http://localhost:8000/proxy/hyperliquid/info' -H Content-Type: application/json -d {"type":"meta"}
-HTTP 200  time=0.484139s  size=17041B
+HTTP 200  time=0.268397s  size=17041B
 --- response headers:
 HTTP/1.1 200 OK
 Access-Control-Allow-Origin: *
 Access-Control-Expose-Headers: *
 Content-Length: 17041
 Content-Type: application/json
-Date: Tue, 21 Apr 2026 20:31:00 GMT
+Date: Tue, 21 Apr 2026 20:44:01 GMT
 Server: nginx/1.22.1
 Vary: origin
 Vary: access-control-request-method
 Vary: access-control-request-headers
-Via: 1.1 c3d7a569db567dde78a645781f9949a2.cloudfront.net (CloudFront)
-X-Amz-Cf-Id: -cC-GxowlYv1VAtXXmearT3S2DMf4aQiaWd__GZSOwiGLdBDfLfBTg==
+Via: 1.1 2837e32f921e7e7517dd6f5461c37dfa.cloudfront.net (CloudFront)
+X-Amz-Cf-Id: ziJRj6GmuT8mk4KvtNiazKxAksb8o_0HFDv4PCBkX_X_YNV-BUwPrg==
 --- response body (first 400B):
 {"universe":[{"szDecimals":5,"name":"BTC","maxLeverage":40,"marginTableId":56},{"szDecimals":4,"name":"ETH","maxLeverage":25,"marginTableId":55},{"szDecimals":2,"name":"ATOM","maxLeverage":5,"marginTableId":5},{"szDecimals":1,"name":"MATIC","maxLeverage":20,"marginTableId":20,"isDelisted":true},{"szDecimals":1,"name":"DYDX","maxLeverage":5,"marginTableId":5},{"szDecimals":2,"name":"SOL","maxLevera
 
 === hl info allMids
 $ curl -sS -X POST 'http://localhost:8000/proxy/hyperliquid/info' -H Content-Type: application/json -d {"type":"allMids"}
-HTTP 200  time=0.231957s  size=9225B
+HTTP 200  time=0.223308s  size=9225B
 --- response headers:
 HTTP/1.1 200 OK
 Access-Control-Allow-Origin: *
 Access-Control-Expose-Headers: *
 Content-Length: 9225
 Content-Type: application/json
-Date: Tue, 21 Apr 2026 20:31:00 GMT
+Date: Tue, 21 Apr 2026 20:44:01 GMT
 Server: nginx/1.22.1
 Vary: origin
 Vary: access-control-request-method
 Vary: access-control-request-headers
-Via: 1.1 c3d7a569db567dde78a645781f9949a2.cloudfront.net (CloudFront)
-X-Amz-Cf-Id: 17nogCeY2M57OkYolWcQONnZcheHZVP-zX_o0gxRJK2LLJOoCgFTPw==
+Via: 1.1 2837e32f921e7e7517dd6f5461c37dfa.cloudfront.net (CloudFront)
+X-Amz-Cf-Id: -NNRMYOflUIxjVAZHU__pXOYTOi5_fKk-4OcJy-aBBZH3SYFbOwUmA==
 --- response body (first 400B):
-{"0G":"0.581315","2Z":"0.083893","@1":"11.6385","@10":"0.00012272","@100":"0.004107","@101":"0.14932","@102":"0.013862","@103":"0.00004532","@104":"0.049392","@105":"0.185335","@106":"0.006816","@107":"39.642","@108":"0.043257","@109":"0.00036749","@11":"0.000339","@110":"0.01641","@111":"0.052622","@112":"0.0005554","@113":"0.0001555","@114":"0.0002855","@115":"0.056569","@116":"0.00001103","@117
+{"0G":"0.580335","2Z":"0.083641","@1":"11.654","@10":"0.00012272","@100":"0.004107","@101":"0.14932","@102":"0.013862","@103":"0.00004532","@104":"0.049392","@105":"0.185335","@106":"0.006816","@107":"39.4195","@108":"0.043257","@109":"0.00036749","@11":"0.000339","@110":"0.01641","@111":"0.052622","@112":"0.0005554","@113":"0.0001555","@114":"0.0002855","@115":"0.056569","@116":"0.00001103","@117
 
 === hl auth stripped
 $ curl -sS -X POST 'http://localhost:8000/proxy/hyperliquid/info' -H Authorization: Bearer leak -H Content-Type: application/json -d {"type":"meta"}
-HTTP 200  time=0.238867s  size=17041B
+HTTP 200  time=0.455104s  size=17041B
 --- response headers:
 HTTP/1.1 200 OK
 Access-Control-Allow-Origin: *
 Access-Control-Expose-Headers: *
 Content-Length: 17041
 Content-Type: application/json
-Date: Tue, 21 Apr 2026 20:31:00 GMT
+Date: Tue, 21 Apr 2026 20:44:01 GMT
 Server: nginx/1.22.1
 Vary: origin
 Vary: access-control-request-method
 Vary: access-control-request-headers
-Via: 1.1 c3d7a569db567dde78a645781f9949a2.cloudfront.net (CloudFront)
-X-Amz-Cf-Id: csYUh1RCPeyQvhvZ76Y9tq7yE2f_vP1VMiKnhZ6LS3S7P8NV2kV6UQ==
+Via: 1.1 2837e32f921e7e7517dd6f5461c37dfa.cloudfront.net (CloudFront)
+X-Amz-Cf-Id: 6m2Orklti08BtyHmy75dN5puM0Okoc5JoYtI8ByjfgCN20pskuzRbw==
 --- response body (first 400B):
 {"universe":[{"szDecimals":5,"name":"BTC","maxLeverage":40,"marginTableId":56},{"szDecimals":4,"name":"ETH","maxLeverage":25,"marginTableId":55},{"szDecimals":2,"name":"ATOM","maxLeverage":5,"marginTableId":5},{"szDecimals":1,"name":"MATIC","maxLeverage":20,"marginTableId":20,"isDelisted":true},{"szDecimals":1,"name":"DYDX","maxLeverage":5,"marginTableId":5},{"szDecimals":2,"name":"SOL","maxLevera
 
 === pm markets
 $ curl -sS -X GET 'http://localhost:8000/proxy/polymarket/markets' 
-HTTP 200  time=0.108581s  size=1823307B
+HTTP 200  time=0.118407s  size=1823307B
 --- response headers:
 HTTP/1.1 200 OK
 Age: 11
 Alt-Svc: h3=":443"; ma=86400
 Cache-Control: public, max-age=30
 Cf-Cache-Status: HIT
-Cf-Ray: 9eff265ece139819-AMS
+Cf-Ray: 9eff3971ef2a2656-AMS
 Content-Type: application/json
-Date: Tue, 21 Apr 2026 20:31:00 GMT
-Expires: Tue, 21 Apr 2026 20:31:30 GMT
-Last-Modified: Tue, 21 Apr 2026 20:30:48 GMT
+Date: Tue, 21 Apr 2026 20:44:02 GMT
+Expires: Tue, 21 Apr 2026 20:44:32 GMT
+Last-Modified: Tue, 21 Apr 2026 20:43:50 GMT
 Server: cloudflare
-Set-Cookie: __cf_bm=8cZk1gsEpwQVkbFb6UODTnKDqpiHZk3WlCDOXCL7p9s-1776803460.92432-1.0.1.1-qPHqmSC3hqrUGYnb_eHiMoPSXoyWIbE9jEvmfCMu.MOix93HNYwIltSw9gBKJAc2p0UUwYCpmAmBIvT5DBMcXD2S_hgSPcZqUDQEPE1wFjALffdqJZXw2uuy_rla3K7D; HttpOnly; Secure; Path=/; Domain=polymarket.com; Expires=Tue, 21 Apr 2026 21:01:00 GMT
+Set-Cookie: __cf_bm=Mwjeqn3LIE9bfrkpSeKkG3MawRAePxQNm9MEUluZEvY-1776804242.227151-1.0.1.1-mvm8BGGtmlahbhPonwgqjwCPMNwPkIvG8dnlqrGzmuGVdJXLH659f2m3EJ76Fi7YdZz0ip9bO2g8bkBmiCydRG2Wz32FUgbOjrt7j_1uYvuwziTOkR4dMrw.ym.nD4Gw; HttpOnly; Secure; Path=/; Domain=polymarket.com; Expires=Tue, 21 Apr 2026 21:14:02 GMT
 --- response body (first 400B):
 {"data":[{"enable_order_book":false,"active":true,"closed":true,"archived":false,"accepting_orders":false,"accepting_order_timestamp":null,"minimum_order_size":15,"minimum_tick_size":0.01,"condition_id":"0x5eed579ff6763914d78a966c83473ba2485ac8910d0a0914eef6d9fcb33085de","question_id":"0x2d5ddf657e4a090bc22921bf6865bcdb741a7b96ce45eb583be041756fad04a0","question":"NCAAB: Arizona State Sun Devils v
 
 === pm markets paginated
 $ curl -sS -X GET 'http://localhost:8000/proxy/polymarket/markets?next_cursor=MA%3D%3D&limit=10' 
-HTTP 200  time=0.230967s  size=1823307B
+HTTP 200  time=0.128958s  size=1823307B
 --- response headers:
 HTTP/1.1 200 OK
 Alt-Svc: h3=":443"; ma=86400
 Cache-Control: public, max-age=30
 Cf-Cache-Status: EXPIRED
-Cf-Ray: 9eff265f6f919819-AMS
+Cf-Ray: 9eff3972a8a92656-AMS
 Content-Type: application/json
-Date: Tue, 21 Apr 2026 20:31:01 GMT
-Expires: Tue, 21 Apr 2026 20:31:31 GMT
-Last-Modified: Tue, 21 Apr 2026 20:31:01 GMT
+Date: Tue, 21 Apr 2026 20:44:02 GMT
+Expires: Tue, 21 Apr 2026 20:44:32 GMT
+Last-Modified: Tue, 21 Apr 2026 20:44:02 GMT
 Server: cloudflare
-Set-Cookie: __cf_bm=17DR2MdxP1ei4wc4Vzvez8s5629m_I5A3vEMlI9gYMs-1776803461.0274856-1.0.1.1-E2TxikpPsfhEhzptJeZ1njuX.2BhytZoyWr9bNdjuWqjCwmy_Aq0c9lrf.J7wZZaJOwz4t3uPbEbYzu62HHavIR7N5s9lBQoVm11SFoBxnJVzXOUgO5YraJKaPOo82xC; HttpOnly; Secure; Path=/; Domain=polymarket.com; Expires=Tue, 21 Apr 2026 21:01:01 GMT
+Set-Cookie: __cf_bm=IAPPW5PdU29fdK6PCwPDhFD9v3NBSOQebdhjjeDRJ4g-1776804242.3475754-1.0.1.1-WZspSsjtZrCAHU95ElBJGPAcUxoeGWpDnR8ddwtAX2o85ol4hpIuo8W6_y1l3bV3y0wUhPH5uOmvTHb.933o4g4nwB9GIvJmMAeKy4Tmlhljknv6TjqL_iJBF4kyyOIc; HttpOnly; Secure; Path=/; Domain=polymarket.com; Expires=Tue, 21 Apr 2026 21:14:02 GMT
 Strict-Transport-Security: max-age=7776000; includeSubDomains
 --- response body (first 400B):
 {"data":[{"enable_order_book":false,"active":true,"closed":true,"archived":false,"accepting_orders":false,"accepting_order_timestamp":null,"minimum_order_size":15,"minimum_tick_size":0.01,"condition_id":"0x5eed579ff6763914d78a966c83473ba2485ac8910d0a0914eef6d9fcb33085de","question_id":"0x2d5ddf657e4a090bc22921bf6865bcdb741a7b96ce45eb583be041756fad04a0","question":"NCAAB: Arizona State Sun Devils v
 
 === bybit time
 $ curl -sS -X GET 'http://localhost:8000/proxy/bybit/v5/market/time' 
-HTTP 200  time=0.169826s  size=134B
+HTTP 200  time=0.206067s  size=134B
 --- response headers:
 HTTP/1.1 200 OK
 Content-Length: 134
 Content-Type: application/json; charset=utf-8
-Date: Tue, 21 Apr 2026 20:31:01 GMT
+Date: Tue, 21 Apr 2026 20:44:02 GMT
 Server: Openresty
-Timenow: 1776803461354
-Traceid: 469dd5ce47aac3091f0930f72978952c
-Via: 1.1 c2c44e18165da827386e0ed36aeea344.cloudfront.net (CloudFront)
-X-Amz-Cf-Id: -_CR2zOWpw7Uscc3CPcYKRvmLmjKLnLUunanpNnaE35SrnSmrkza-g==
+Timenow: 1776804242608
+Traceid: 3451bff56258f581133dc198edd5d7ad
+Via: 1.1 0a3248cb2729105e64fb474faf90e3b2.cloudfront.net (CloudFront)
+X-Amz-Cf-Id: _gE5GMGinMDV85w6rQTIIEmr64eLvXK1w3iM5JjX9xBg0740rYZlYQ==
 X-Amz-Cf-Pop: AMS58-P3
 X-Cache: Miss from cloudfront
 X-Cld-Src: Loc-A
 --- response body (first 400B):
-{"retCode":0,"retMsg":"OK","result":{"timeSecond":"1776803461","timeNano":"1776803461354429991"},"retExtInfo":{},"time":1776803461354}
+{"retCode":0,"retMsg":"OK","result":{"timeSecond":"1776804242","timeNano":"1776804242608422612"},"retExtInfo":{},"time":1776804242608}
 
 === bybit tickers
 $ curl -sS -X GET 'http://localhost:8000/proxy/bybit/v5/market/tickers?category=linear&symbol=BTCUSDT' 
-HTTP 200  time=0.175405s  size=803B
+HTTP 200  time=0.171091s  size=794B
 --- response headers:
 HTTP/1.1 200 OK
-Content-Length: 803
+Content-Length: 794
 Content-Type: application/json; charset=utf-8
-Date: Tue, 21 Apr 2026 20:31:01 GMT
+Date: Tue, 21 Apr 2026 20:44:02 GMT
 Ret_code: 0
 Server: Openresty
-Timenow: 1776803461544
-Traceid: 3b1a257e5b385965437085f153541f89
-Via: 1.1 c2c44e18165da827386e0ed36aeea344.cloudfront.net (CloudFront)
-X-Amz-Cf-Id: YpICHFKSLDEniEjGuNNpzDmLZISSXyTgreDJ9PuG5DRIngZ71RtT_w==
+Timenow: 1776804242791
+Traceid: 6b73d8c18a32e3b43ecc28d574206650
+Via: 1.1 0a3248cb2729105e64fb474faf90e3b2.cloudfront.net (CloudFront)
+X-Amz-Cf-Id: _BgsWMTr7F2r1Sfzl13TORq9T-TQniCFJ_lG_zBDgQPJkTLrSTIakg==
 X-Amz-Cf-Pop: AMS58-P3
 X-Cache: Miss from cloudfront
 --- response body (first 400B):
-{"retCode":0,"retMsg":"OK","result":{"category":"linear","list":[{"symbol":"BTCUSDT","lastPrice":"75641.60","indexPrice":"75678.58","markPrice":"75641.70","prevPrice24h":"76193.10","price24hPcnt":"-0.007238","highPrice24h":"76934.10","lowPrice24h":"74769.60","prevPrice1h":"75739.50","openInterest":"50976.059","openInterestValue":"3855915762.06","turnover24h":"5479306796.5452","volume24h":"72237.90
+{"retCode":0,"retMsg":"OK","result":{"category":"linear","list":[{"symbol":"BTCUSDT","lastPrice":"75625.00","indexPrice":"75664.02","markPrice":"75625.00","prevPrice24h":"76185.80","price24hPcnt":"-0.00736","highPrice24h":"76934.10","lowPrice24h":"74769.60","prevPrice1h":"74888.60","openInterest":"51042.938","openInterestValue":"3860122186.25","turnover24h":"5493366855.5645","volume24h":"72425.342
 
 === bybit kline
 $ curl -sS -X GET 'http://localhost:8000/proxy/bybit/v5/market/kline?category=linear&symbol=BTCUSDT&interval=60&limit=5' 
-HTTP 200  time=0.182215s  size=549B
+HTTP 200  time=0.169825s  size=547B
 --- response headers:
 HTTP/1.1 200 OK
-Content-Length: 549
+Content-Length: 547
 Content-Type: application/json
-Date: Tue, 21 Apr 2026 20:31:01 GMT
+Date: Tue, 21 Apr 2026 20:44:02 GMT
 Ret_code: 0
 Server: Openresty
-Timenow: 1776803461742
-Traceid: 2f5cef4a21d494310e81dd3a9b33a318
-Via: 1.1 c2c44e18165da827386e0ed36aeea344.cloudfront.net (CloudFront)
-X-Amz-Cf-Id: jJekm-sE-gPUqYVTkNjL6RVFN5jJI-bbuTWpYKN2-6GCDN-iCoIkxg==
+Timenow: 1776804242974
+Traceid: 6d7f70aeb4867fb111e35986991e87b8
+Via: 1.1 0a3248cb2729105e64fb474faf90e3b2.cloudfront.net (CloudFront)
+X-Amz-Cf-Id: LHUb0oBt9XFOuVZwi5RA9iZ9wmWnMa9LVESLhoDPOqsCwMPsYT7qpg==
 X-Amz-Cf-Pop: AMS58-P3
 X-Cache: Miss from cloudfront
 --- response body (first 400B):
-{"retCode":0,"retMsg":"OK","result":{"symbol":"BTCUSDT","category":"linear","list":[["1776801600000","74984.9","75752.9","74940","75641.7","4260.625","321178506.9372"],["1776798000000","75568.8","75877.5","74769.6","74984.9","6566.002","493863280.3418"],["1776794400000","75508.7","75627.5","75258.9","75568.8","1926.128","145349415.4809"],["1776790800000","75729.7","75877.8","75006.7","75508.7","64
+{"retCode":0,"retMsg":"OK","result":{"symbol":"BTCUSDT","category":"linear","list":[["1776801600000","74984.9","75827.1","74940","75625","4738.906","357397888.0738"],["1776798000000","75568.8","75877.5","74769.6","74984.9","6566.002","493863280.3418"],["1776794400000","75508.7","75627.5","75258.9","75568.8","1926.128","145349415.4809"],["1776790800000","75729.7","75877.8","75006.7","75508.7","6441
 
 === bybit orderbook
 $ curl -sS -X GET 'http://localhost:8000/proxy/bybit/v5/market/orderbook?category=linear&symbol=BTCUSDT&limit=25' 
-HTTP 200  time=0.172787s  size=1159B
+HTTP 200  time=0.170423s  size=1155B
 --- response headers:
 HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
-Date: Tue, 21 Apr 2026 20:31:01 GMT
+Date: Tue, 21 Apr 2026 20:44:03 GMT
 Ret_code: 0
 Server: Openresty
-Timenow: 1776803461928
-Traceid: 39f6fca6375a339b1a8d4414531dd2e5
+Timenow: 1776804243159
+Traceid: 4cf0c7713296f375768eb9ca04b19569
 Vary: Accept-Encoding
-Via: 1.1 c2c44e18165da827386e0ed36aeea344.cloudfront.net (CloudFront)
-X-Amz-Cf-Id: cpj2Cprx_IHA47VgKh5anNAeeaivU1_TqvmPeXjjCFv9hf6tCSdV_w==
+Via: 1.1 0a3248cb2729105e64fb474faf90e3b2.cloudfront.net (CloudFront)
+X-Amz-Cf-Id: qom6CBvVf4uHQE9S04IKvLXoID-1875kn0DGmACVKu3rjojy3avapA==
 X-Amz-Cf-Pop: AMS58-P3
 X-Cache: Miss from cloudfront
 --- response body (first 400B):
-{"retCode":0,"retMsg":"OK","result":{"s":"BTCUSDT","b":[["75643.2","7.4"],["75643.1","0.001"],["75642.8","0.001"],["75642.2","0.861"],["75642.1","0.696"],["75642","0.689"],["75641.7","0.737"],["75641.6","1.222"],["75641.4","0.057"],["75641.3","0.002"],["75640.8","0.001"],["75640.3","0.499"],["75640","0.002"],["75639.4","0.002"],["75639.2","0.001"],["75639.1","0.001"],["75638.8","0.001"],["75638.7"
+{"retCode":0,"retMsg":"OK","result":{"s":"BTCUSDT","b":[["75625","0.477"],["75624.9","0.001"],["75624.3","0.002"],["75624","0.001"],["75623.5","0.003"],["75623.4","0.001"],["75623.3","0.002"],["75622.8","0.002"],["75622.6","0.001"],["75622.5","0.003"],["75621.9","0.002"],["75621.2","0.001"],["75621","0.001"],["75620.9","0.001"],["75620.6","0.054"],["75620.4","0.008"],["75620.3","0.124"],["75620.2"
 

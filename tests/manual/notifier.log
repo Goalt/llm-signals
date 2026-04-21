@@ -1,0 +1,39 @@
+
+================================================================
+== Scenario 1-3: seed, new-item dispatch, idle tick
+================================================================
+20:37:45.516178 PASS: seed pass polled the channel at least once (calls=2)
+20:37:45.516288 PASS: seed pass did NOT dispatch to hookA (got 0)
+20:37:45.516290 PASS: seed pass did NOT dispatch to hookB (got 0)
+20:37:45.517866 [hookA] ← POST /  ct="application/json; charset=UTF-8"  #1 item=new-2
+20:37:45.518245 [hookB] ← POST /  ct="application/json; charset=UTF-8"  #1 item=new-2
+20:37:45.518374 [hookA] ← POST /  ct="application/json; charset=UTF-8"  #2 item=new-3
+20:37:45.518469 [hookB] ← POST /  ct="application/json; charset=UTF-8"  #2 item=new-3
+20:37:45.546664 PASS: received 2 deliveries on each webhook (hookA=2 hookB=2)
+20:37:45.897459 PASS: idle ticks triggered no extra deliveries (before=4 after=4)
+20:37:45.897476 PASS: payload channel="chanA" want chanA
+20:37:45.897481 PASS: payload item ID="new-2" is one of the new ones
+
+================================================================
+== Scenario 4: 500 receiver + fetch error on another channel
+================================================================
+20:37:45.897715 notifier: fetch "bad" failed: simulated upstream failure
+20:37:45.998757 notifier: fetch "bad" failed: simulated upstream failure
+20:37:46.098027 notifier: fetch "bad" failed: simulated upstream failure
+20:37:46.098700 [hookC-500] ← POST /  ct="application/json; charset=UTF-8"  #1 item=o-2
+20:37:46.098851 notifier: webhook "http://127.0.0.1:36889" failed: unexpected status 500
+20:37:46.128927 PASS: failing webhook was still attempted (hookC=1)
+20:37:46.128945 PASS: bad channel kept being polled despite errors (calls=3)
+20:37:46.128947 PASS: ok channel kept being polled (calls=3)
+
+================================================================
+== Scenario 5: Config validation via Run()
+================================================================
+20:37:46.128984 PASS: config "no channels" rejected with error: notifier: no channels configured
+20:37:46.128990 PASS: config "no webhooks" rejected with error: notifier: no webhooks configured
+20:37:46.128992 PASS: config "non-positive interval" rejected with error: notifier: interval must be positive
+
+================================================================
+== Summary
+================================================================
+ALL ASSERTIONS PASSED

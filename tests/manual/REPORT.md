@@ -15,7 +15,7 @@
 | 2 | `GET /feed/ab` | 400 `Invalid channel_name` | 400, body `Invalid channel_name` | ✅ |
 | 3 | `GET /feed/hello-world` | 400 `Invalid channel_name` | 400, body `Invalid channel_name` | ✅ |
 | 4 | `GET /feed/aaaa…aaa` (33 chars) | 400 `Invalid channel_name` | 400, body `Invalid channel_name` | ✅ |
-| 5 | `GET /feed/this_channel_does_not_exist_0001` | 400 `Telegram channel not found` | **200 OK, пустые items** | ⚠ баг/лимитация |
+| 5 | `GET /feed/this_channel_does_not_exist_0001` | 400 `Telegram channel not found` | 400, body `Telegram channel not found` | ✅ **FIXED** |
 | 6 | `GET /unknown` | 404 `Not Found` | 404, body `Not Found` | ✅ |
 | 7 | `GET /feed/durov` | 200, валидный JSON фид | 200, 66 225 B, `Cache-Control: max-age=60, public`, items с контентом | ✅ |
 | 8 | `GET /feed/telegram` | 200, валидный JSON фид | 200, 72 353 B, title `Telegram News – Telegram` | ✅ |
@@ -29,39 +29,29 @@
 | 16 | `GET /proxy/bybit/v5/market/kline?…interval=60&limit=5` | 200, 5 свечей | 200, `list` содержит OHLCV-массивы | ✅ |
 | 17 | `GET /proxy/bybit/v5/market/orderbook?…limit=25` | 200, `result.b` / `result.a` | 200, `"b":[["75643.2","7.4"],…]` | ✅ |
 
-**Итог:** 16/17 ✅, 1 ⚠ (см. ниже).
+**Итог:** 17/17 ✅
 
 ## Замечания
 
-### ⚠ Несуществующий Telegram-канал отдаёт 200 с пустым фидом
+### ✅ Несуществующий Telegram-канал — ИСПРАВЛЕНО
 
-**Пример 5:** `GET /feed/this_channel_does_not_exist_0001` вернул:
+**Проблема (исправлена 2026-04-21):** Ранее `GET /feed/<nonexistent>` возвращал HTTP 200 с пустым фидом, так как Telegram отдаёт HTTP 200 для несуществующих каналов со страницей «Contact @…».
 
-```http
-HTTP/1.1 200 OK
-Cache-Control: max-age=60, public
-Content-Type: application/json; charset=UTF-8
+**Решение:** Реализован фикс #2 из предложенных — проверка наличия `<div class="tgme_channel_info">` после успешного HTTP-ответа. Если этого элемента нет (как на страницах «Contact @…»), возвращается ошибка `Telegram channel not found` с HTTP 400.
+
+**Код изменений:**
+- [internal/app/service.go](../../internal/app/service.go) — добавлена проверка `hasChannelInfo` в `GetJSONFeed()`
+- [internal/app/service_test.go](../../internal/app/service_test.go) — добавлен тест `TestGetJSONFeedChannelNotFoundContactPage`
+- [tests/app_test.go](../../tests/app_test.go) — добавлен black-box тест `TestApp_GetJSONFeed_ChannelNotFoundContactPage`
+
+**Текущее поведение:**
+```bash
+$ curl -i http://localhost:8000/feed/nonexistentchannel123456789
+HTTP/1.1 400 Bad Request
+Content-Type: text/plain; charset=UTF-8
+
+Telegram channel not found
 ```
-
-```json
-{
-  "title": "Telegram: Contact @this_channel_does_not_exist_0001",
-  "link":  "https://t.me/s/this_channel_does_not_exist_0001",
-  "description": "Posts from Telegram: Contact @this_channel_does_not_exist_0001",
-  "created": "2026-04-21T20:30:59.639400093Z",
-  "items": []
-}
-```
-
-**Причина:** `t.me/s/<unknown>` отвечает HTTP 200 страницей «Contact @…», поэтому проверка `res.StatusCode != 200` в [internal/app/service.go](../../internal/app/service.go#L141) не срабатывает — документ парсится, в нём нет `tgme_widget_message_bubble`, и мы отдаём пустой фид.
-
-**Противоречит** README ("Telegram channel not found") и поведению, задокументированному в [internal/app/service_test.go](../../internal/app/service_test.go#L75) — тест это покрывает только моком, возвращающим 404.
-
-**Возможные фиксы** (на выбор, не реализованы — требуется решение):
-
-1. После парсинга проверять: если `doc.Find("div.tgme_channel_info").Length() == 0` и в body присутствует маркер «Contact @…» — возвращать ошибку «Telegram channel not found».
-2. Проверять наличие `<meta property="og:type" content="profile">` / отсутствие `og:type=website` + отсутствие `.tgme_channel_info` → трактовать как not-found.
-3. Если `items == 0` и `title` начинается с `Telegram: Contact @` — возвращать 404 или ошибку с текстом из README.
 
 ### ℹ Прокси корректно глушит клиентский `Authorization`
 
