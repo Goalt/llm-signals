@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
 	"html"
 	"net/http"
@@ -9,7 +10,6 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/gorilla/feeds"
 )
 
 const (
@@ -30,6 +30,30 @@ type Service struct {
 	Now     func() time.Time
 }
 
+type FeedJSON struct {
+	Title       string         `json:"title"`
+	Link        string         `json:"link"`
+	Description string         `json:"description"`
+	Created     time.Time      `json:"created"`
+	Items       []FeedItemJSON `json:"items"`
+}
+
+type FeedItemJSON struct {
+	Title       string             `json:"title"`
+	Description string             `json:"description"`
+	Link        string             `json:"link"`
+	Created     time.Time          `json:"created"`
+	ID          string             `json:"id"`
+	Content     string             `json:"content"`
+	Enclosure   *FeedEnclosureJSON `json:"enclosure,omitempty"`
+}
+
+type FeedEnclosureJSON struct {
+	URL    string `json:"url"`
+	Length string `json:"length"`
+	Type   string `json:"type"`
+}
+
 func NewService(client *http.Client) *Service {
 	if client == nil {
 		client = &http.Client{Timeout: timeoutSeconds * time.Second}
@@ -47,18 +71,18 @@ func (s *Service) HandleFeedRequest(channelName string) (int, string, map[string
 		return http.StatusBadRequest, "Invalid channel_name", headers
 	}
 
-	rssXML, err := s.GetRSSFeed(channelName)
+	jsonBody, err := s.GetJSONFeed(channelName)
 	if err != nil {
 		return http.StatusBadRequest, err.Error(), headers
 	}
 
-	return http.StatusOK, rssXML, map[string]string{
-		"Content-Type":  "application/rss+xml; charset=UTF-8",
+	return http.StatusOK, jsonBody, map[string]string{
+		"Content-Type":  "application/json; charset=UTF-8",
 		"Cache-Control": "max-age=60, public",
 	}
 }
 
-func (s *Service) GetRSSFeed(channelName string) (string, error) {
+func (s *Service) GetJSONFeed(channelName string) (string, error) {
 	doc, err := s.getDoc(channelName)
 	if err != nil {
 		return "", err
@@ -78,27 +102,27 @@ func (s *Service) GetRSSFeed(channelName string) (string, error) {
 		}
 	}
 
-	feed := &feeds.Feed{
+	feed := FeedJSON{
 		Title:       title,
-		Link:        &feeds.Link{Href: s.channelURL(channelName)},
+		Link:        s.channelURL(channelName),
 		Description: description,
 		Created:     s.Now(),
 	}
 
-	items := make([]*feeds.Item, 0)
+	items := make([]FeedItemJSON, 0)
 	doc.Find("div.tgme_widget_message_bubble").Each(func(_ int, sel *goquery.Selection) {
 		item := buildItem(sel, channelName)
 		if item != nil {
-			items = append(items, item)
+			items = append(items, *item)
 		}
 	})
 	feed.Items = items
 
-	rss, err := feed.ToRss()
+	jsonBytes, err := json.Marshal(feed)
 	if err != nil {
 		return "", err
 	}
-	return rss, nil
+	return string(jsonBytes), nil
 }
 
 func (s *Service) channelURL(channelName string) string {
@@ -130,7 +154,7 @@ func (s *Service) getDoc(channelName string) (*goquery.Document, error) {
 	return doc, nil
 }
 
-func buildItem(bubble *goquery.Selection, channelName string) *feeds.Item {
+func buildItem(bubble *goquery.Selection, channelName string) *FeedItemJSON {
 	link, ok := bubble.Find("a.tgme_widget_message_date[href]").First().Attr("href")
 	if !ok || strings.TrimSpace(link) == "" {
 		return nil
@@ -157,17 +181,17 @@ func buildItem(bubble *goquery.Selection, channelName string) *feeds.Item {
 		mediaHTML += `<p><img src="` + escapeAttr(photo) + `" referrerpolicy="no-referrer"/></p>`
 	}
 
-	item := &feeds.Item{
+	item := &FeedItemJSON{
 		Title:       "New post in channel @" + channelName,
 		Description: descriptionHTML + mediaHTML,
-		Link:        &feeds.Link{Href: link},
+		Link:        link,
 		Created:     pub,
-		Id:          link,
+		ID:          link,
 		Content:     strings.TrimSpace(rawHTML + mediaHTML),
 	}
 
 	if len(photos) > 0 {
-		item.Enclosure = &feeds.Enclosure{Url: photos[0], Length: "0", Type: guessMIME(photos[0])}
+		item.Enclosure = &FeedEnclosureJSON{URL: photos[0], Length: "0", Type: guessMIME(photos[0])}
 	}
 	return item
 }

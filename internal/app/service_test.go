@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -22,7 +23,7 @@ func TestHandleFeedRequestValidation(t *testing.T) {
 	}
 }
 
-func TestGetRSSFeedSuccess(t *testing.T) {
+func TestGetJSONFeedSuccess(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/s/testch1" {
 			http.NotFound(w, r)
@@ -50,20 +51,25 @@ func TestGetRSSFeedSuccess(t *testing.T) {
 	svc.BaseURL = server.URL
 	svc.Now = func() time.Time { return time.Date(2026, 4, 21, 15, 0, 0, 0, time.UTC) }
 
-	rss, err := svc.GetRSSFeed("testch1")
+	feedJSON, err := svc.GetJSONFeed("testch1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	checks := []string{"<title>Test Channel</title>", "Test Description", "https://t.me/s/testch1/123", "https://cdn.example.com/photo.jpg"}
+	checks := []string{`"title":"Test Channel"`, `"description":"Test Description"`, `"link":"https://t.me/s/testch1/123"`, `"url":"https://cdn.example.com/photo.jpg"`}
 	for _, check := range checks {
-		if !strings.Contains(rss, check) {
-			t.Fatalf("expected rss to contain %q", check)
+		if !strings.Contains(feedJSON, check) {
+			t.Fatalf("expected feed json to contain %q", check)
 		}
+	}
+
+	var parsed FeedJSON
+	if err := json.Unmarshal([]byte(feedJSON), &parsed); err != nil {
+		t.Fatalf("invalid json returned: %v", err)
 	}
 }
 
-func TestGetRSSFeedChannelNotFound(t *testing.T) {
+func TestGetJSONFeedChannelNotFound(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
@@ -72,7 +78,7 @@ func TestGetRSSFeedChannelNotFound(t *testing.T) {
 	svc := NewService(server.Client())
 	svc.BaseURL = server.URL
 
-	_, err := svc.GetRSSFeed("testch1")
+	_, err := svc.GetJSONFeed("testch1")
 	if err == nil || err.Error() != "Telegram channel not found" {
 		t.Fatalf("expected Telegram channel not found error, got %v", err)
 	}

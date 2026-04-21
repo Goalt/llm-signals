@@ -1,6 +1,6 @@
 # tg-channel-to-rss
 
-Go service for converting a **public Telegram channel** into an **RSS feed**.
+Go service for converting a **public Telegram channel** into a **JSON feed**.
 
 ## How it works
 1. The service receives HTTP requests:
@@ -11,7 +11,7 @@ Go service for converting a **public Telegram channel** into an **RSS feed**.
    - Post text,
    - Photo preview images,
    - Publication time and post URL.
-4. The extracted data is returned as RSS XML.
+4. The extracted data is returned as JSON.
 
 ⚠ **Limitations**
 - Telegram **does not guarantee** that all public channels expose their posts on `t.me/s/…`.
