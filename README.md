@@ -1,25 +1,30 @@
 # tg-channel-to-rss
-Dockerized service (with AWS Lambda-compatible handler) for converting a **public Telegram channel** into an **RSS feed**.
+
+Go service for converting a **public Telegram channel** into an **RSS feed**.
 
 ## How it works
 1. The service receives HTTP requests:
    `GET /feed/{channel_name}`
 2. It fetches the public static view of the channel at
    `https://t.me/s/{channel_name}`.
-3. Using **BeautifulSoup**, it parses each Telegram message bubble, extracts:
-   - Post text (with links preserved),
-   - Photo previews and link-preview images,
+3. It parses Telegram message bubbles and extracts:
+   - Post text,
+   - Photo preview images,
    - Publication time and post URL.
-4. The extracted data is converted into an RSS feed with [rfeed](https://pypi.org/project/rfeed/), returning valid XML to the caller.
+4. The extracted data is returned as RSS XML.
 
 ⚠ **Limitations**
 - Telegram **does not guarantee** that all public channels expose their posts on `t.me/s/…`.
-- Channels flagged as **sensitive**, geo-restricted, or with **content protection** enabled may show a blank page or limited content even though they are public in the Telegram app.
-- There is no workaround other than viewing those channels within Telegram or using the official Bot API.
+- Channels flagged as **sensitive**, geo-restricted, or with **content protection** enabled may show a blank page or limited content.
 
 ## Requirements
-- Python 3.13 or higher
+- Go 1.24+
 - Docker
+
+## Run locally
+```bash
+go run ./cmd/server
+```
 
 ## Build and run with Docker
 1. Build image:
@@ -32,12 +37,10 @@ docker run --rm -p 8000:8000 tg-channel-to-rss
 ```
 
 ## Usage
-Call the endpoint with the channel name:
 ```bash
 curl 'http://localhost:8000/feed/cool_telegram_channel'
 ```
-This returns an RSS XML feed of the channel’s recent posts, including text and photo previews, ready to import into your RSS reader.
 
 ## Optional environment variables
-- `PORT` (optional, default `8000`): HTTP listening port inside the container.
-- `HOST` (optional, default `0.0.0.0`): HTTP bind address.
+- `PORT` (default `8000`): HTTP listening port.
+- `HOST` (default `0.0.0.0`): HTTP bind address.

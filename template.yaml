@@ -1,16 +1,16 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: "AWS Lambda function for converting of Telegram channel to RSS feed."
+Description: "AWS Lambda function for converting Telegram channel posts to RSS feed."
 
 Resources:
   TgChannelToRssFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Runtime: python3.13
+      Runtime: go1.x
       Timeout: 300
       MemorySize: 128
-      CodeUri: lambda
-      Handler: app.lambda_handler
+      CodeUri: .
+      Handler: tg-channel-to-rss
       Events:
         GetChannelAsRss:
           Type: Api

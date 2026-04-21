@@ -1,16 +1,17 @@
-FROM python:3.13-slim
+FROM golang:1.24-bookworm AS builder
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PORT=8000
+WORKDIR /src
+COPY go.mod go.sum* ./
+RUN go mod download
 
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/tg-channel-to-rss ./cmd/server
+
+FROM debian:bookworm-slim
+
+ENV PORT=8000
 WORKDIR /app
-
-COPY lambda/requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
-
-COPY lambda /app/lambda
+COPY --from=builder /out/tg-channel-to-rss /app/tg-channel-to-rss
 
 EXPOSE 8000
-
-CMD ["python", "-u", "/app/lambda/app.py"]
+CMD ["/app/tg-channel-to-rss"]
