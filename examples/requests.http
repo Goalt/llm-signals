@@ -1,0 +1,149 @@
+###############################################################################
+# tg-channel-to-rss — example HTTP requests
+#
+# Usage:
+#   - VS Code: install the "REST Client" extension (humao.rest-client) and press
+#     "Send Request" above any block.
+#   - Or copy the URL into curl / httpie.
+#
+# The `@host` variable defaults to the local dev server started via
+#   `go run ./cmd/server`
+###############################################################################
+
+@host = http://localhost:8000
+
+# ────────────────────────────────────────────────────────────────────────────
+#  Feed endpoints (Telegram channel → JSON feed)
+# ────────────────────────────────────────────────────────────────────────────
+
+### Happy-path: fetch a public Telegram channel as JSON
+GET {{host}}/feed/durov
+Accept: application/json
+
+### Channel with underscores and digits (must match ^[A-Za-z0-9_]{5,32}$)
+GET {{host}}/feed/telegram_tips
+
+### Missing channel name → 400 "Missing channel_name"
+GET {{host}}/feed/
+
+### Invalid channel name (too short) → 400 "Invalid channel_name"
+GET {{host}}/feed/ab
+
+### Invalid channel name (illegal char) → 400 "Invalid channel_name"
+GET {{host}}/feed/hello-world
+
+### Non-existent channel → 400 "Telegram channel not found"
+GET {{host}}/feed/this_channel_does_not_exist_0001
+
+### Unknown path → 404 Not Found
+GET {{host}}/unknown
+
+
+# ────────────────────────────────────────────────────────────────────────────
+#  /proxy/hyperliquid/*  → forwards to HYPERLIQUID_API_BASE_URL
+#  The server injects HYPERLIQUID_AUTHORIZATION server-side; any client-side
+#  Authorization header is stripped before forwarding.
+# ────────────────────────────────────────────────────────────────────────────
+
+### Hyperliquid: market metadata via POST /info
+POST {{host}}/proxy/hyperliquid/info
+Content-Type: application/json
+
+{
+  "type": "meta"
+}
+
+### Hyperliquid: all mids via POST /info
+POST {{host}}/proxy/hyperliquid/info
+Content-Type: application/json
+
+{
+  "type": "allMids"
+}
+
+### Hyperliquid: user state for an address
+POST {{host}}/proxy/hyperliquid/info
+Content-Type: application/json
+
+{
+  "type": "clearinghouseState",
+  "user": "0x0000000000000000000000000000000000000000"
+}
+
+### Hyperliquid: client-provided Authorization MUST be ignored
+POST {{host}}/proxy/hyperliquid/info
+Content-Type: application/json
+Authorization: Bearer this-should-be-stripped
+
+{
+  "type": "meta"
+}
+
+
+# ────────────────────────────────────────────────────────────────────────────
+#  /proxy/polymarket/*  → forwards to POLYMARKET_API_BASE_URL
+# ────────────────────────────────────────────────────────────────────────────
+
+### Polymarket: list markets
+GET {{host}}/proxy/polymarket/markets
+
+### Polymarket: list markets with query params passthrough
+GET {{host}}/proxy/polymarket/markets?next_cursor=MA==&limit=10
+
+### Polymarket: single market by condition id
+GET {{host}}/proxy/polymarket/markets/0x0000000000000000000000000000000000000000000000000000000000000000
+
+### Polymarket: orderbook for a token id
+GET {{host}}/proxy/polymarket/book?token_id=1
+
+
+# ────────────────────────────────────────────────────────────────────────────
+#  /proxy/bybit/*  → forwards to BYBIT_API_BASE_URL
+# ────────────────────────────────────────────────────────────────────────────
+
+### Bybit: server time (no auth required upstream)
+GET {{host}}/proxy/bybit/v5/market/time
+
+### Bybit: linear tickers
+GET {{host}}/proxy/bybit/v5/market/tickers?category=linear
+
+### Bybit: single instrument ticker
+GET {{host}}/proxy/bybit/v5/market/tickers?category=linear&symbol=BTCUSDT
+
+### Bybit: kline / candles
+GET {{host}}/proxy/bybit/v5/market/kline?category=linear&symbol=BTCUSDT&interval=60&limit=5
+
+### Bybit: orderbook depth
+GET {{host}}/proxy/bybit/v5/market/orderbook?category=linear&symbol=BTCUSDT&limit=25
+
+
+# ────────────────────────────────────────────────────────────────────────────
+#  Webhook receiver (for local notifier testing)
+#
+#  Start a listener with:
+#      python3 -m http.server 9000
+#  or run any echo server, then set:
+#      WEBHOOKS=http://localhost:9000/hook
+#  The block below documents the exact payload the notifier emits per new post.
+# ────────────────────────────────────────────────────────────────────────────
+
+### Example webhook payload (reference — NOT a real request)
+POST http://localhost:9000/hook
+Content-Type: application/json; charset=UTF-8
+
+{
+  "channel": "channel_a",
+  "item": {
+    "title": "New post in channel @channel_a",
+    "description": "<p>hello world</p>",
+    "link": "https://t.me/s/channel_a/123",
+    "created": "2026-04-21T12:00:00Z",
+    "id": "https://t.me/s/channel_a/123",
+    "content": "hello world",
+    "enclosure": {
+      "url": "https://cdn4.telegram-cdn.org/file/photo.jpg",
+      "length": "0",
+      "type": "image/jpeg"
+    }
+  }
+}
