@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -22,6 +23,24 @@ import (
 var log applog.Logger
 
 func main() {
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "test-webhook":
+			os.Exit(runTestWebhook(os.Args[2:]))
+		case "serve", "server":
+			// explicit server mode; fall through to default startup
+		case "-h", "--help", "help":
+			printUsage(os.Stdout)
+			return
+		default:
+			if !strings.HasPrefix(os.Args[1], "-") {
+				fmt.Fprintf(os.Stderr, "unknown subcommand %q\n\n", os.Args[1])
+				printUsage(os.Stderr)
+				os.Exit(2)
+			}
+		}
+	}
+
 	log = applog.New(
 		envOrDefault("APP_ENV", "production"),
 		envOrDefault("LOG_LEVEL", "info"),
@@ -235,4 +254,16 @@ func envOrDefault(name, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func printUsage(w *os.File) {
+	fmt.Fprintf(w, `Usage: server [subcommand] [flags]
+
+Subcommands:
+  serve          Run the HTTP server (default when no subcommand is given).
+  test-webhook   Send a synthetic notifier payload to the configured WEBHOOKS.
+                 Run "server test-webhook -h" for available flags.
+
+Environment variables are documented in .env.example.
+`)
 }

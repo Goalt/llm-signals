@@ -148,11 +148,28 @@ func TestSeedAndDispatchNewItems(t *testing.T) {
 		t.Fatalf("expected 4 deliveries, got %d: %+v", len(got), got)
 	}
 	ids := map[string]int{}
+	itemToDelivery := map[string]string{}
 	for _, r := range got {
 		if r.Body.Channel != "chan1" {
 			t.Errorf("wrong channel: %q", r.Body.Channel)
 		}
+		if r.Body.SourceType != SourceTypeTelegram {
+			t.Errorf("wrong source_type: %q", r.Body.SourceType)
+		}
+		if r.Body.SourceURL != "https://t.me/s/chan1" {
+			t.Errorf("wrong source_url: %q", r.Body.SourceURL)
+		}
+		if r.Body.ID == "" {
+			t.Errorf("empty delivery id")
+		}
+		if prev, ok := itemToDelivery[r.Body.Item.ID]; ok && prev != r.Body.ID {
+			t.Errorf("same item %q got different delivery ids %q vs %q", r.Body.Item.ID, prev, r.Body.ID)
+		}
+		itemToDelivery[r.Body.Item.ID] = r.Body.ID
 		ids[r.Body.Item.ID]++
+	}
+	if itemToDelivery["https://t.me/chan1/2"] == itemToDelivery["https://t.me/chan1/3"] {
+		t.Errorf("different items share delivery id")
 	}
 	if ids["https://t.me/chan1/2"] != 2 || ids["https://t.me/chan1/3"] != 2 {
 		t.Errorf("unexpected delivery distribution: %v", ids)

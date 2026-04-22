@@ -5,6 +5,8 @@ package notifier
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -16,6 +18,9 @@ import (
 	applog "github.com/Goalt/logger/logger"
 	"github.com/Goalt/tg-channel-to-rss/internal/app"
 )
+
+// SourceTypeTelegram identifies a Telegram public channel as the post source.
+const SourceTypeTelegram = "telegram"
 
 // FeedFetcher fetches the current JSON feed for a single Telegram channel.
 // It is satisfied by *app.Service but kept as an interface for testability.
@@ -37,8 +42,17 @@ type Config struct {
 
 // Payload is the JSON body sent to each webhook for every new post.
 type Payload struct {
-	Channel string           `json:"channel"`
-	Item    app.FeedItemJSON `json:"item"`
+	// ID is a unique identifier of this dispatch event (UUIDv4). It is
+	// generated once per new post and shared across every webhook that
+	// receives the same post, so receivers can correlate or deduplicate
+	// deliveries of the same event.
+	ID string `json:"id"`
+	// SourceType identifies the kind of source the post came from (e.g. "telegram").
+	SourceType string `json:"source_type"`
+	// SourceURL is the canonical URL of the source (e.g. the channel page).
+	SourceURL string `json:"source_url"`
+	Channel   string           `json:"channel"`
+	Item      app.FeedItemJSON `json:"item"`
 }
 
 // Notifier polls Telegram channels and dispatches new posts to webhooks.
@@ -176,12 +190,19 @@ func (n *Notifier) pollChannel(ctx context.Context, channel string, seed bool) {
 	}
 
 	for _, item := range newItems {
-		n.dispatch(ctx, channel, item)
+		n.dispatch(ctx, channel, feed.Link, item)
 	}
 }
 
-func (n *Notifier) dispatch(ctx context.Context, channel string, item app.FeedItemJSON) {
-	body, err := json.Marshal(Payload{Channel: channel, Item: item})
+func (n *Notifier) dispatch(ctx context.Context, channel, sourceURL string, item app.FeedItemJSON) {
+	payload := Payload{
+		ID:         newDeliveryID(),
+		SourceType: SourceTypeTelegram,
+		SourceURL:  sourceURL,
+		Channel:    channel,
+		Item:       item,
+	}
+	body, err := json.Marshal(payload)
 	if err != nil {
 		n.log.Errorf(ctx, "notifier: marshal payload failed: %v", err)
 		return
@@ -196,8 +217,8 @@ func (n *Notifier) dispatch(ctx context.Context, channel string, item app.FeedIt
 			n.log.Warnf(ctx, "notifier: webhook %q failed: %v", webhook, err)
 			continue
 		}
-		n.log.Infof(ctx, "notifier: webhook %q delivered channel=%q item=%q bytes=%d",
-			webhook, channel, id, len(body))
+		n.log.Infof(ctx, "notifier: webhook %q delivered channel=%q item=%q bytes=%d delivery=%q source=%q",
+			webhook, channel, id, len(body), payload.ID, sourceURL)
 	}
 }
 
@@ -218,4 +239,25 @@ func (n *Notifier) postWebhook(ctx context.Context, url string, body []byte) err
 		return fmt.Errorf("unexpected status %d", res.StatusCode)
 	}
 	return nil
+}
+
+// newDeliveryID returns a RFC 4122 v4 UUID string used as the unique webhook
+// delivery identifier. On the extremely unlikely event that crypto/rand fails
+// it falls back to a timestamp-based id so a delivery is never blocked by id
+// generation.
+func newDeliveryID() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return fmt.Sprintf("ts-%d", time.Now().UnixNano())
+	}
+	// Set version (4) and variant (RFC 4122) bits.
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%s-%s-%s-%s-%s",
+		hex.EncodeToString(b[0:4]),
+		hex.EncodeToString(b[4:6]),
+		hex.EncodeToString(b[6:8]),
+		hex.EncodeToString(b[8:10]),
+		hex.EncodeToString(b[10:16]),
+	)
 }
