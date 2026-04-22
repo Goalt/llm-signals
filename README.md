@@ -206,3 +206,26 @@ new post to every configured webhook:
   "item": { "title": "...", "link": "...", "created": "...", "id": "...", "content": "..." }
 }
 ```
+
+## RSS/Atom notifier module
+
+The same webhook payload can also be produced from any standard RSS 2.0 or
+Atom feed. This notifier runs in parallel with the Telegram and x.com
+notifiers when configured.
+
+### Run with RSS notifier enabled
+```bash
+RSS_FEEDS=https://example.com/rss,https://blog.example.com/atom \
+WEBHOOKS=https://example.com/hook1 \
+RSS_POLL_INTERVAL=5m \
+go run ./cmd/server
+```
+
+### Environment variables
+- `RSS_FEEDS` (optional): comma-separated list of full `http(s)` URLs of RSS 2.0 or Atom feeds. Required to enable the RSS notifier.
+- `WEBHOOKS` (required): comma-separated webhook URLs (shared with the other notifiers).
+- `RSS_POLL_INTERVAL` (optional, default `5m`): polling interval as a Go duration.
+- `RSS_MIN_REQUEST_INTERVAL` (optional, default `1s`): minimum spacing between outbound RSS HTTP requests. `0` disables throttling.
+
+The `channel` field in the webhook payload contains the feed URL that produced
+the item, so downstream consumers can correlate posts with their source.

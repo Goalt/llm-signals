@@ -15,6 +15,7 @@ import (
 	applog "github.com/Goalt/logger/logger"
 	"github.com/Goalt/tg-channel-to-rss/internal/app"
 	"github.com/Goalt/tg-channel-to-rss/internal/notifier"
+	"github.com/Goalt/tg-channel-to-rss/internal/rssapi"
 	"github.com/Goalt/tg-channel-to-rss/internal/xapi"
 )
 
@@ -124,6 +125,7 @@ func main() {
 
 	startNotifier(runCtx, svc)
 	startXNotifier(runCtx)
+	startRSSNotifier(runCtx)
 
 	addr := host + ":" + strconv.Itoa(port)
 	srv := &http.Server{
@@ -241,6 +243,51 @@ func startXNotifier(ctx context.Context) {
 	go func() {
 		if err := n.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 			log.Errorf(ctx, "x.com notifier stopped: %v", err)
+		}
+	}()
+}
+
+// startRSSNotifier launches an RSS/Atom poller that reuses the notifier
+// pipeline. It is enabled when RSS_FEEDS and WEBHOOKS are configured. Each
+// entry in RSS_FEEDS must be a full http(s) URL pointing at an RSS 2.0 or
+// Atom feed.
+func startRSSNotifier(ctx context.Context) {
+	feeds := splitList(os.Getenv("RSS_FEEDS"))
+	webhooks := splitList(os.Getenv("WEBHOOKS"))
+
+	if len(feeds) == 0 || len(webhooks) == 0 {
+		log.Infof(ctx, "rss notifier disabled: set RSS_FEEDS and WEBHOOKS to enable")
+		return
+	}
+
+	interval, err := time.ParseDuration(envOrDefault("RSS_POLL_INTERVAL", "5m"))
+	if err != nil {
+		log.Errorf(ctx, "invalid RSS_POLL_INTERVAL: %v", err)
+		os.Exit(1)
+	}
+
+	minRequestInterval, err := time.ParseDuration(envOrDefault("RSS_MIN_REQUEST_INTERVAL", "1s"))
+	if err != nil {
+		log.Errorf(ctx, "invalid RSS_MIN_REQUEST_INTERVAL: %v", err)
+		os.Exit(1)
+	}
+
+	fetcher := rssapi.NewService(nil)
+	if minRequestInterval > 0 {
+		fetcher.Limiter = xapi.NewRateLimiter(minRequestInterval)
+	}
+
+	n := notifier.New(notifier.Config{
+		Channels:    feeds,
+		Webhooks:    webhooks,
+		Interval:    interval,
+		HTTPTimeout: 30 * time.Second,
+	}, fetcher, nil, log)
+
+	log.Infof(ctx, "rss notifier: polling %d feed(s) every %s, dispatching to %d webhook(s) (min request interval: %s)", len(feeds), interval, len(webhooks), minRequestInterval)
+	go func() {
+		if err := n.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			log.Errorf(ctx, "rss notifier stopped: %v", err)
 		}
 	}()
 }
