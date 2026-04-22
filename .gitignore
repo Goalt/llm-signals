@@ -9,3 +9,12 @@ __pycache__/
 bin/
 *.test
 *.out
+
+# Environment files with secrets — never commit
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+tests/manual/*.log

@@ -88,10 +88,44 @@ func main() {
 	startXNotifier(ctx)
 
 	addr := host + ":" + strconv.Itoa(port)
-	log.Printf("Serving tg-channel-to-rss on http://%s", addr)
-	if err := http.ListenAndServe(addr, handler); err != nil {
-		log.Fatalf("server error: %v", err)
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
+
+	serverErr := make(chan error, 1)
+	go func() {
+		log.Printf("Serving tg-channel-to-rss on http://%s", addr)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErr <- err
+			return
+		}
+		serverErr <- nil
+	}()
+
+	select {
+	case <-ctx.Done():
+		log.Printf("shutdown signal received, draining connections...")
+	case err := <-serverErr:
+		if err != nil {
+			log.Fatalf("server error: %v", err)
+		}
+		return
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("graceful shutdown error: %v", err)
+		if closeErr := srv.Close(); closeErr != nil {
+			log.Printf("forced close error: %v", closeErr)
+		}
+	}
+	if err := <-serverErr; err != nil {
+		log.Printf("server exited with error: %v", err)
+	}
+	log.Printf("server stopped")
 }
 
 // startNotifier launches the webhook notifier in a background goroutine when

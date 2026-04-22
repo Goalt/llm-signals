@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"sync"
 	"time"
 
@@ -125,6 +126,24 @@ func (n *Notifier) pollChannel(ctx context.Context, channel string, seed bool) {
 		return
 	}
 
+	// Sort items by creation time descending so index 0 is the newest post
+	// regardless of upstream ordering.
+	sort.SliceStable(feed.Items, func(i, j int) bool {
+		return feed.Items[i].Created.After(feed.Items[j].Created)
+	})
+
+	if len(feed.Items) > 0 {
+		latest := feed.Items[0]
+		id := latest.ID
+		if id == "" {
+			id = latest.Link
+		}
+		n.logger.Printf("notifier: debug %q latest item id=%q title=%q link=%q created=%s items=%d",
+			channel, id, latest.Title, latest.Link, latest.Created.Format(time.RFC3339), len(feed.Items))
+	} else {
+		n.logger.Printf("notifier: debug %q feed has no items", channel)
+	}
+
 	n.mu.Lock()
 	seen, ok := n.seen[channel]
 	if !ok {
@@ -133,7 +152,9 @@ func (n *Notifier) pollChannel(ctx context.Context, channel string, seed bool) {
 	}
 
 	newItems := make([]app.FeedItemJSON, 0)
-	for _, item := range feed.Items {
+	// Walk oldest -> newest so dispatched webhooks arrive in chronological order.
+	for i := len(feed.Items) - 1; i >= 0; i-- {
+		item := feed.Items[i]
 		id := item.ID
 		if id == "" {
 			id = item.Link
@@ -167,10 +188,17 @@ func (n *Notifier) dispatch(ctx context.Context, channel string, item app.FeedIt
 		return
 	}
 
+	id := item.ID
+	if id == "" {
+		id = item.Link
+	}
 	for _, webhook := range n.cfg.Webhooks {
 		if err := n.postWebhook(ctx, webhook, body); err != nil {
 			n.logger.Printf("notifier: webhook %q failed: %v", webhook, err)
+			continue
 		}
+		n.logger.Printf("notifier: webhook %q delivered channel=%q item=%q bytes=%d",
+			webhook, channel, id, len(body))
 	}
 }
 

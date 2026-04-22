@@ -22,9 +22,90 @@ Go service for converting a **public Telegram channel** into a **JSON feed**.
 - Docker
 
 ## Run locally
+
+### 1. Скопируйте пример конфигурации
+
+```bash
+cp .env.example .env
+```
+
+Файл [.env.example](.env.example) описывает все переменные окружения сервиса.
+Отредактируйте `.env` и оставьте пустыми те блоки, которые не используете —
+нотификаторы и прокси активируются только при наличии соответствующих значений.
+
+### 2. Запустите сервер
+
+Минимальный запуск (только HTTP-фид, без нотификаторов):
+
 ```bash
 go run ./cmd/server
 ```
+
+С загрузкой `.env` (bash / zsh):
+
+```bash
+set -a && source .env && set +a && go run ./cmd/server
+```
+
+Альтернативно, через [`godotenv`](https://github.com/joho/godotenv/tree/master/cmd/godotenv):
+
+```bash
+go install github.com/joho/godotenv/cmd/godotenv@latest
+godotenv -f .env go run ./cmd/server
+```
+
+Сервер выведет в лог статус нотификаторов и адрес прослушивания:
+
+```
+notifier disabled: set TG_CHANNELS and WEBHOOKS to enable
+x.com notifier disabled: set X_USERS and WEBHOOKS to enable
+Serving tg-channel-to-rss on http://0.0.0.0:8000
+```
+
+### 3. Проверьте, что фид работает
+
+```bash
+curl 'http://localhost:8000/feed/durov' | jq '.title, (.items | length)'
+```
+
+Ожидаемый результат — `"Pavel Durov – Telegram"` и число постов > 0.
+
+Несуществующий канал возвращает `400 Telegram channel not found`:
+
+```bash
+curl -i 'http://localhost:8000/feed/nonexistent_channel_xyz'
+# HTTP/1.1 400 Bad Request
+# Telegram channel not found
+```
+
+### 4. (Опционально) Включите нотификаторы
+
+- **Telegram → вебхуки:** заполните в `.env` `TG_CHANNELS=durov,telegram` и `WEBHOOKS=https://hooks.example.com/tg`.
+- **x.com → вебхуки:** дополнительно к `WEBHOOKS` заполните `X_USERS=elonmusk` и `X_BEARER_TOKEN=<bearer>` (токен получить на developer.x.com).
+
+Перезапустите сервер и убедитесь, что в логе вместо `disabled` появляется:
+
+```
+notifier: polling 2 channel(s) every 5m0s, dispatching to 1 webhook(s)
+x.com notifier: polling 1 user(s) every 5m0s, dispatching to 1 webhook(s)
+```
+
+### 5. (Опционально) Запустите тесты
+
+```bash
+# Быстрый регресс (unit + black-box):
+go test ./... -count=1
+
+# Manual HTTP — требует запущенного сервера:
+bash tests/manual/run.sh        # лог: tests/manual/run.log
+
+# Нотификаторы — без внешних зависимостей:
+go run ./tests/manual/notifier_e2e
+bash tests/manual/notifier-wiring.sh
+```
+
+Полный 7-слойный регресс описан в [.github/agents/api-integrator.agent.md](.github/agents/api-integrator.agent.md)
+и автоматизирован в [.github/workflows/agent-regression.yml](.github/workflows/agent-regression.yml).
 
 ## Build and run with Docker
 1. Build image:
