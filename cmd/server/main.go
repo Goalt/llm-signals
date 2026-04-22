@@ -225,8 +225,14 @@ func startXNotifier(ctx context.Context) {
 		log.Errorf(ctx, "invalid X_MIN_REQUEST_INTERVAL: %v", err)
 		os.Exit(1)
 	}
+	useFilteredStream, err := strconv.ParseBool(envOrDefault("X_FILTERED_STREAM", "false"))
+	if err != nil {
+		log.Errorf(ctx, "invalid X_FILTERED_STREAM: %v", err)
+		os.Exit(1)
+	}
 
 	fetcher := xapi.NewService(token, nil)
+	fetcher.UseFilteredStream = useFilteredStream
 	if minRequestInterval > 0 {
 		fetcher.Limiter = xapi.NewRateLimiter(minRequestInterval)
 	}
@@ -237,7 +243,11 @@ func startXNotifier(ctx context.Context) {
 		HTTPTimeout: 30 * time.Second,
 	}, fetcher, nil, log)
 
-	log.Infof(ctx, "x.com notifier: polling %d user(s) every %s, dispatching to %d webhook(s) (min request interval: %s)", len(users), interval, len(webhooks), minRequestInterval)
+	mode := "timeline polling"
+	if useFilteredStream {
+		mode = "filtered stream"
+	}
+	log.Infof(ctx, "x.com notifier: polling %d user(s) every %s, dispatching to %d webhook(s) (mode: %s, min request interval: %s)", len(users), interval, len(webhooks), mode, minRequestInterval)
 	go func() {
 		if err := n.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 			log.Errorf(ctx, "x.com notifier stopped: %v", err)

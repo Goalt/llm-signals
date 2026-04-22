@@ -185,6 +185,7 @@ when configured.
 X_USERS=jack,github \
 X_BEARER_TOKEN=your_x_api_bearer_token \
 WEBHOOKS=https://example.com/hook1,https://example.com/hook2 \
+X_FILTERED_STREAM=true \
 X_POLL_INTERVAL=5m \
 go run ./cmd/server
 ```
@@ -192,6 +193,7 @@ go run ./cmd/server
 ### Environment variables
 - `X_USERS` (optional): comma-separated list of x.com usernames to poll.
 - `X_BEARER_TOKEN` (required when `X_USERS` is set): x.com API bearer token.
+- `X_FILTERED_STREAM` (optional, default `false`): enable X API v2 Filtered Stream mode for x.com fetches.
 - `WEBHOOKS` (required): comma-separated webhook URLs (shared with Telegram notifier).
 - `X_POLL_INTERVAL` (optional, default `5m`): polling interval as a Go duration.
 
