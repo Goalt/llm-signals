@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"context"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -49,8 +49,14 @@ func newAPIProxy(cfg apiProxyConfig) (http.Handler, error) {
 		}
 	}
 
-	proxy.ErrorHandler = func(w http.ResponseWriter, _ *http.Request, err error) {
-		log.Printf("proxy error (%s): %v", cfg.Name, err)
+	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+		ctx := r.Context()
+		if ctx == nil {
+			ctx = context.Background()
+		}
+		if log != nil {
+			log.Errorf(ctx, "proxy error (%s): %v", cfg.Name, err)
+		}
 		http.Error(w, "Upstream request failed", http.StatusBadGateway)
 	}
 

@@ -1,50 +1,53 @@
 
 ── no env: both notifiers disabled ──
 env: 
-2026/04/21 20:44:15 notifier disabled: set TG_CHANNELS and WEBHOOKS to enable
-2026/04/21 20:44:15 x.com notifier disabled: set X_USERS and WEBHOOKS to enable
-2026/04/21 20:44:15 Serving tg-channel-to-rss on http://127.0.0.1:18101
+{"env":"production","func":"/workspaces/llm-signals/cmd/server/main.go:159","hawk_id":"","level":"info","msg":"notifier disabled: set TG_CHANNELS and WEBHOOKS to enable","release_version":"unknown","sentry_id":"","time":"2026-04-22T11:14:50Z"}
+{"env":"production","func":"/workspaces/llm-signals/cmd/server/main.go:190","hawk_id":"","level":"info","msg":"x.com notifier disabled: set X_USERS and WEBHOOKS to enable","release_version":"unknown","sentry_id":"","time":"2026-04-22T11:14:50Z"}
+{"env":"production","func":"/workspaces/llm-signals/cmd/server/main.go:118","hawk_id":"","level":"info","msg":"Serving tg-channel-to-rss on http://127.0.0.1:18101","release_version":"unknown","sentry_id":"","time":"2026-04-22T11:14:50Z"}
 PASS: no env: both notifiers disabled
 
 ── TG channels + WEBHOOKS: tg notifier enabled ──
 env: TG_CHANNELS=durov,telegram WEBHOOKS=http://127.0.0.1:9/a,http://127.0.0.1:9/b POLL_INTERVAL=10s
-2026/04/21 20:44:17 notifier: polling 2 channel(s) every 10s, dispatching to 2 webhook(s)
-2026/04/21 20:44:17 x.com notifier disabled: set X_USERS and WEBHOOKS to enable
-2026/04/21 20:44:17 Serving tg-channel-to-rss on http://127.0.0.1:18102
+{"env":"production","func":"/workspaces/llm-signals/cmd/server/main.go:176","hawk_id":"","level":"info","msg":"notifier: polling 2 channel(s) every 10s, dispatching to 2 webhook(s)","release_version":"unknown","sentry_id":"","time":"2026-04-22T11:14:51Z"}
+{"env":"production","func":"/workspaces/llm-signals/cmd/server/main.go:190","hawk_id":"","level":"info","msg":"x.com notifier disabled: set X_USERS and WEBHOOKS to enable","release_version":"unknown","sentry_id":"","time":"2026-04-22T11:14:51Z"}
+{"env":"production","func":"/workspaces/llm-signals/cmd/server/main.go:118","hawk_id":"","level":"info","msg":"Serving tg-channel-to-rss on http://127.0.0.1:18102","release_version":"unknown","sentry_id":"","time":"2026-04-22T11:14:51Z"}
+{"env":"production","func":"/workspaces/llm-signals/internal/notifier/notifier.go:142","hawk_id":"","level":"info","msg":"notifier: debug \"durov\" latest item id=\"https://t.me/s/durov/497\" title=\"New post in channel @durov\" link=\"https://t.me/s/durov/497\" created=2026-04-20T22:55:10Z items=20","release_version":"unknown","sentry_id":"","time":"2026-04-22T11:14:51Z"}
+{"env":"production","func":"/workspaces/llm-signals/internal/notifier/notifier.go:142","hawk_id":"","level":"info","msg":"notifier: debug \"telegram\" latest item id=\"https://t.me/s/telegram/439\" title=\"New post in channel @telegram\" link=\"https://t.me/s/telegram/439\" created=2026-04-09T07:02:48Z items=20","release_version":"unknown","sentry_id":"","time":"2026-04-22T11:14:52Z"}
 PASS: TG channels + WEBHOOKS: tg notifier enabled
 
 ── X_USERS without X_BEARER_TOKEN: x notifier disabled ──
 env: X_USERS=jack WEBHOOKS=http://127.0.0.1:9/a
-2026/04/21 20:44:18 notifier disabled: set TG_CHANNELS and WEBHOOKS to enable
-2026/04/21 20:44:18 x.com notifier disabled: set X_BEARER_TOKEN
-2026/04/21 20:44:18 Serving tg-channel-to-rss on http://127.0.0.1:18103
+{"env":"production","func":"/workspaces/llm-signals/cmd/server/main.go:159","hawk_id":"","level":"info","msg":"notifier disabled: set TG_CHANNELS and WEBHOOKS to enable","release_version":"unknown","sentry_id":"","time":"2026-04-22T11:14:53Z"}
+{"env":"production","func":"/workspaces/llm-signals/cmd/server/main.go:194","hawk_id":"","level":"info","msg":"x.com notifier disabled: set X_BEARER_TOKEN","release_version":"unknown","sentry_id":"","time":"2026-04-22T11:14:53Z"}
+{"env":"production","func":"/workspaces/llm-signals/cmd/server/main.go:118","hawk_id":"","level":"info","msg":"Serving tg-channel-to-rss on http://127.0.0.1:18103","release_version":"unknown","sentry_id":"","time":"2026-04-22T11:14:53Z"}
 PASS: X_USERS without X_BEARER_TOKEN: x notifier disabled
 
 ── X_USERS + token + WEBHOOKS: x notifier enabled ──
 env: X_USERS=jack X_BEARER_TOKEN=fake-token WEBHOOKS=http://127.0.0.1:9/a X_POLL_INTERVAL=10s
-2026/04/21 20:44:20 notifier disabled: set TG_CHANNELS and WEBHOOKS to enable
-2026/04/21 20:44:20 x.com notifier: polling 1 user(s) every 10s, dispatching to 1 webhook(s)
-2026/04/21 20:44:20 Serving tg-channel-to-rss on http://127.0.0.1:18104
-2026/04/21 20:44:20 notifier: fetch "jack" failed: x.com API request failed with status 401
+{"env":"production","func":"/workspaces/llm-signals/cmd/server/main.go:159","hawk_id":"","level":"info","msg":"notifier disabled: set TG_CHANNELS and WEBHOOKS to enable","release_version":"unknown","sentry_id":"","time":"2026-04-22T11:14:54Z"}
+{"env":"production","func":"/workspaces/llm-signals/cmd/server/main.go:212","hawk_id":"","level":"info","msg":"x.com notifier: polling 1 user(s) every 10s, dispatching to 1 webhook(s)","release_version":"unknown","sentry_id":"","time":"2026-04-22T11:14:54Z"}
+{"env":"production","func":"/workspaces/llm-signals/cmd/server/main.go:118","hawk_id":"","level":"info","msg":"Serving tg-channel-to-rss on http://127.0.0.1:18104","release_version":"unknown","sentry_id":"","time":"2026-04-22T11:14:54Z"}
+{"env":"production","func":"/workspaces/llm-signals/internal/notifier/notifier.go:120","hawk_id":"","level":"error","msg":"notifier: fetch \"jack\" failed: x.com API request failed with status 401","release_version":"unknown","sentry_id":"","time":"2026-04-22T11:14:54Z"}
 PASS: X_USERS + token + WEBHOOKS: x notifier enabled
 
 ── TG + X both enabled simultaneously ──
 env: TG_CHANNELS=durov X_USERS=jack X_BEARER_TOKEN=fake-token WEBHOOKS=http://127.0.0.1:9/a POLL_INTERVAL=10s X_POLL_INTERVAL=10s
-2026/04/21 20:44:21 notifier: polling 1 channel(s) every 10s, dispatching to 1 webhook(s)
-2026/04/21 20:44:21 x.com notifier: polling 1 user(s) every 10s, dispatching to 1 webhook(s)
-2026/04/21 20:44:21 Serving tg-channel-to-rss on http://127.0.0.1:18105
-2026/04/21 20:44:22 notifier: fetch "jack" failed: x.com API request failed with status 401
+{"env":"production","func":"/workspaces/llm-signals/cmd/server/main.go:176","hawk_id":"","level":"info","msg":"notifier: polling 1 channel(s) every 10s, dispatching to 1 webhook(s)","release_version":"unknown","sentry_id":"","time":"2026-04-22T11:14:56Z"}
+{"env":"production","func":"/workspaces/llm-signals/cmd/server/main.go:212","hawk_id":"","level":"info","msg":"x.com notifier: polling 1 user(s) every 10s, dispatching to 1 webhook(s)","release_version":"unknown","sentry_id":"","time":"2026-04-22T11:14:56Z"}
+{"env":"production","func":"/workspaces/llm-signals/cmd/server/main.go:118","hawk_id":"","level":"info","msg":"Serving tg-channel-to-rss on http://127.0.0.1:18105","release_version":"unknown","sentry_id":"","time":"2026-04-22T11:14:56Z"}
+{"env":"production","func":"/workspaces/llm-signals/internal/notifier/notifier.go:142","hawk_id":"","level":"info","msg":"notifier: debug \"durov\" latest item id=\"https://t.me/s/durov/497\" title=\"New post in channel @durov\" link=\"https://t.me/s/durov/497\" created=2026-04-20T22:55:10Z items=20","release_version":"unknown","sentry_id":"","time":"2026-04-22T11:14:56Z"}
+{"env":"production","func":"/workspaces/llm-signals/internal/notifier/notifier.go:120","hawk_id":"","level":"error","msg":"notifier: fetch \"jack\" failed: x.com API request failed with status 401","release_version":"unknown","sentry_id":"","time":"2026-04-22T11:14:56Z"}
 PASS: TG + X both enabled simultaneously
 
 ── invalid POLL_INTERVAL: fatal ──
 env: TG_CHANNELS=durov WEBHOOKS=http://127.0.0.1:9/a POLL_INTERVAL=not-a-duration
-2026/04/21 20:44:23 invalid POLL_INTERVAL: time: invalid duration "not-a-duration"
+{"env":"production","func":"/workspaces/llm-signals/cmd/server/main.go:165","hawk_id":"","level":"error","msg":"invalid POLL_INTERVAL: time: invalid duration \"not-a-duration\"","release_version":"unknown","sentry_id":"","time":"2026-04-22T11:14:57Z"}
 PASS: invalid POLL_INTERVAL: fatal
 
 ── invalid X_POLL_INTERVAL: fatal ──
 env: X_USERS=jack X_BEARER_TOKEN=t WEBHOOKS=http://127.0.0.1:9/a X_POLL_INTERVAL=bogus
-2026/04/21 20:44:23 notifier disabled: set TG_CHANNELS and WEBHOOKS to enable
-2026/04/21 20:44:23 invalid X_POLL_INTERVAL: time: invalid duration "bogus"
+{"env":"production","func":"/workspaces/llm-signals/cmd/server/main.go:159","hawk_id":"","level":"info","msg":"notifier disabled: set TG_CHANNELS and WEBHOOKS to enable","release_version":"unknown","sentry_id":"","time":"2026-04-22T11:14:57Z"}
+{"env":"production","func":"/workspaces/llm-signals/cmd/server/main.go:200","hawk_id":"","level":"error","msg":"invalid X_POLL_INTERVAL: time: invalid duration \"bogus\"","release_version":"unknown","sentry_id":"","time":"2026-04-22T11:14:57Z"}
 PASS: invalid X_POLL_INTERVAL: fatal
 
 ==========================

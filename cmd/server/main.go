@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,16 +11,33 @@ import (
 	"syscall"
 	"time"
 
+	applog "github.com/Goalt/logger/logger"
 	"github.com/Goalt/tg-channel-to-rss/internal/app"
 	"github.com/Goalt/tg-channel-to-rss/internal/notifier"
 	"github.com/Goalt/tg-channel-to-rss/internal/xapi"
 )
 
+// log is the process-wide structured logger. It is initialized in main() so
+// tests of other entry points don't incur logger setup cost on import.
+var log applog.Logger
+
 func main() {
+	log = applog.New(
+		envOrDefault("APP_ENV", "production"),
+		envOrDefault("LOG_LEVEL", "info"),
+		envOrDefault("RELEASE_VERSION", "unknown"),
+		os.Stdout,
+		envOrDefault("LOG_TRACE_LEVEL", "error"),
+		nil,
+	)
+
+	ctx := context.Background()
+
 	host := envOrDefault("HOST", "0.0.0.0")
 	port, err := strconv.Atoi(envOrDefault("PORT", "8000"))
 	if err != nil {
-		log.Fatalf("invalid PORT value: %v", err)
+		log.Errorf(ctx, "invalid PORT value: %v", err)
+		os.Exit(1)
 	}
 
 	svc := app.NewService(http.DefaultClient)
@@ -32,7 +48,8 @@ func main() {
 		Name:          "hyperliquid",
 	})
 	if err != nil {
-		log.Fatalf("failed to initialize hyperliquid proxy: %v", err)
+		log.Errorf(ctx, "failed to initialize hyperliquid proxy: %v", err)
+		os.Exit(1)
 	}
 	polymarketProxy, err := newAPIProxy(apiProxyConfig{
 		RoutePrefix:   "/proxy/polymarket",
@@ -41,7 +58,8 @@ func main() {
 		Name:          "polymarket",
 	})
 	if err != nil {
-		log.Fatalf("failed to initialize polymarket proxy: %v", err)
+		log.Errorf(ctx, "failed to initialize polymarket proxy: %v", err)
+		os.Exit(1)
 	}
 	bybitProxy, err := newAPIProxy(apiProxyConfig{
 		RoutePrefix:   "/proxy/bybit",
@@ -50,7 +68,8 @@ func main() {
 		Name:          "bybit",
 	})
 	if err != nil {
-		log.Fatalf("failed to initialize bybit proxy: %v", err)
+		log.Errorf(ctx, "failed to initialize bybit proxy: %v", err)
+		os.Exit(1)
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -81,11 +100,11 @@ func main() {
 		_, _ = w.Write([]byte(body))
 	})
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	runCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	startNotifier(ctx, svc)
-	startXNotifier(ctx)
+	startNotifier(runCtx, svc)
+	startXNotifier(runCtx)
 
 	addr := host + ":" + strconv.Itoa(port)
 	srv := &http.Server{
@@ -96,7 +115,7 @@ func main() {
 
 	serverErr := make(chan error, 1)
 	go func() {
-		log.Printf("Serving tg-channel-to-rss on http://%s", addr)
+		log.Infof(runCtx, "Serving tg-channel-to-rss on http://%s", addr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serverErr <- err
 			return
@@ -105,11 +124,12 @@ func main() {
 	}()
 
 	select {
-	case <-ctx.Done():
-		log.Printf("shutdown signal received, draining connections...")
+	case <-runCtx.Done():
+		log.Infof(runCtx, "shutdown signal received, draining connections...")
 	case err := <-serverErr:
 		if err != nil {
-			log.Fatalf("server error: %v", err)
+			log.Errorf(runCtx, "server error: %v", err)
+			os.Exit(1)
 		}
 		return
 	}
@@ -117,15 +137,15 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("graceful shutdown error: %v", err)
+		log.Errorf(shutdownCtx, "graceful shutdown error: %v", err)
 		if closeErr := srv.Close(); closeErr != nil {
-			log.Printf("forced close error: %v", closeErr)
+			log.Errorf(shutdownCtx, "forced close error: %v", closeErr)
 		}
 	}
 	if err := <-serverErr; err != nil {
-		log.Printf("server exited with error: %v", err)
+		log.Errorf(shutdownCtx, "server exited with error: %v", err)
 	}
-	log.Printf("server stopped")
+	log.Infof(shutdownCtx, "server stopped")
 }
 
 // startNotifier launches the webhook notifier in a background goroutine when
@@ -136,13 +156,14 @@ func startNotifier(ctx context.Context, fetcher notifier.FeedFetcher) {
 	webhooks := splitList(os.Getenv("WEBHOOKS"))
 
 	if len(channels) == 0 || len(webhooks) == 0 {
-		log.Printf("notifier disabled: set TG_CHANNELS and WEBHOOKS to enable")
+		log.Infof(ctx, "notifier disabled: set TG_CHANNELS and WEBHOOKS to enable")
 		return
 	}
 
 	interval, err := time.ParseDuration(envOrDefault("POLL_INTERVAL", "5m"))
 	if err != nil {
-		log.Fatalf("invalid POLL_INTERVAL: %v", err)
+		log.Errorf(ctx, "invalid POLL_INTERVAL: %v", err)
+		os.Exit(1)
 	}
 
 	n := notifier.New(notifier.Config{
@@ -150,12 +171,12 @@ func startNotifier(ctx context.Context, fetcher notifier.FeedFetcher) {
 		Webhooks:    webhooks,
 		Interval:    interval,
 		HTTPTimeout: 30 * time.Second,
-	}, fetcher, nil, nil)
+	}, fetcher, nil, log)
 
-	log.Printf("notifier: polling %d channel(s) every %s, dispatching to %d webhook(s)", len(channels), interval, len(webhooks))
+	log.Infof(ctx, "notifier: polling %d channel(s) every %s, dispatching to %d webhook(s)", len(channels), interval, len(webhooks))
 	go func() {
 		if err := n.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
-			log.Printf("notifier stopped: %v", err)
+			log.Errorf(ctx, "notifier stopped: %v", err)
 		}
 	}()
 }
@@ -166,17 +187,18 @@ func startXNotifier(ctx context.Context) {
 	token := strings.TrimSpace(os.Getenv("X_BEARER_TOKEN"))
 
 	if len(users) == 0 || len(webhooks) == 0 {
-		log.Printf("x.com notifier disabled: set X_USERS and WEBHOOKS to enable")
+		log.Infof(ctx, "x.com notifier disabled: set X_USERS and WEBHOOKS to enable")
 		return
 	}
 	if token == "" {
-		log.Printf("x.com notifier disabled: set X_BEARER_TOKEN")
+		log.Infof(ctx, "x.com notifier disabled: set X_BEARER_TOKEN")
 		return
 	}
 
 	interval, err := time.ParseDuration(envOrDefault("X_POLL_INTERVAL", "5m"))
 	if err != nil {
-		log.Fatalf("invalid X_POLL_INTERVAL: %v", err)
+		log.Errorf(ctx, "invalid X_POLL_INTERVAL: %v", err)
+		os.Exit(1)
 	}
 
 	fetcher := xapi.NewService(token, nil)
@@ -185,12 +207,12 @@ func startXNotifier(ctx context.Context) {
 		Webhooks:    webhooks,
 		Interval:    interval,
 		HTTPTimeout: 30 * time.Second,
-	}, fetcher, nil, nil)
+	}, fetcher, nil, log)
 
-	log.Printf("x.com notifier: polling %d user(s) every %s, dispatching to %d webhook(s)", len(users), interval, len(webhooks))
+	log.Infof(ctx, "x.com notifier: polling %d user(s) every %s, dispatching to %d webhook(s)", len(users), interval, len(webhooks))
 	go func() {
 		if err := n.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
-			log.Printf("x.com notifier stopped: %v", err)
+			log.Errorf(ctx, "x.com notifier stopped: %v", err)
 		}
 	}()
 }

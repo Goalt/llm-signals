@@ -7,12 +7,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
+	"os"
 	"sort"
 	"sync"
 	"time"
 
+	applog "github.com/Goalt/logger/logger"
 	"github.com/Goalt/tg-channel-to-rss/internal/app"
 )
 
@@ -45,29 +46,29 @@ type Notifier struct {
 	cfg     Config
 	fetcher FeedFetcher
 	client  *http.Client
-	logger  *log.Logger
+	log     applog.Logger
 
 	mu   sync.Mutex
 	seen map[string]map[string]struct{} // channel -> set of post IDs
 }
 
 // New creates a Notifier. If client is nil a default client with HTTPTimeout is used.
-// If logger is nil the standard logger is used.
-func New(cfg Config, fetcher FeedFetcher, client *http.Client, logger *log.Logger) *Notifier {
+// If log is nil a default JSON logger writing to stderr is used.
+func New(cfg Config, fetcher FeedFetcher, client *http.Client, log applog.Logger) *Notifier {
 	if cfg.HTTPTimeout <= 0 {
 		cfg.HTTPTimeout = 30 * time.Second
 	}
 	if client == nil {
 		client = &http.Client{Timeout: cfg.HTTPTimeout}
 	}
-	if logger == nil {
-		logger = log.Default()
+	if log == nil {
+		log = applog.New("notifier", "info", "unknown", os.Stderr, "info", nil)
 	}
 	return &Notifier{
 		cfg:     cfg,
 		fetcher: fetcher,
 		client:  client,
-		logger:  logger,
+		log:     log,
 		seen:    make(map[string]map[string]struct{}),
 	}
 }
@@ -116,13 +117,13 @@ func (n *Notifier) tick(ctx context.Context, seed bool) {
 func (n *Notifier) pollChannel(ctx context.Context, channel string, seed bool) {
 	raw, err := n.fetcher.GetJSONFeed(channel)
 	if err != nil {
-		n.logger.Printf("notifier: fetch %q failed: %v", channel, err)
+		n.log.Errorf(ctx, "notifier: fetch %q failed: %v", channel, err)
 		return
 	}
 
 	var feed app.FeedJSON
 	if err := json.Unmarshal([]byte(raw), &feed); err != nil {
-		n.logger.Printf("notifier: decode %q failed: %v", channel, err)
+		n.log.Errorf(ctx, "notifier: decode %q failed: %v", channel, err)
 		return
 	}
 
@@ -138,10 +139,8 @@ func (n *Notifier) pollChannel(ctx context.Context, channel string, seed bool) {
 		if id == "" {
 			id = latest.Link
 		}
-		n.logger.Printf("notifier: debug %q latest item id=%q title=%q link=%q created=%s items=%d",
-			channel, id, latest.Title, latest.Link, latest.Created.Format(time.RFC3339), len(feed.Items))
 	} else {
-		n.logger.Printf("notifier: debug %q feed has no items", channel)
+		n.log.Infof(ctx, "notifier: debug %q feed has no items", channel)
 	}
 
 	n.mu.Lock()
@@ -184,7 +183,7 @@ func (n *Notifier) pollChannel(ctx context.Context, channel string, seed bool) {
 func (n *Notifier) dispatch(ctx context.Context, channel string, item app.FeedItemJSON) {
 	body, err := json.Marshal(Payload{Channel: channel, Item: item})
 	if err != nil {
-		n.logger.Printf("notifier: marshal payload failed: %v", err)
+		n.log.Errorf(ctx, "notifier: marshal payload failed: %v", err)
 		return
 	}
 
@@ -194,10 +193,10 @@ func (n *Notifier) dispatch(ctx context.Context, channel string, item app.FeedIt
 	}
 	for _, webhook := range n.cfg.Webhooks {
 		if err := n.postWebhook(ctx, webhook, body); err != nil {
-			n.logger.Printf("notifier: webhook %q failed: %v", webhook, err)
+			n.log.Warnf(ctx, "notifier: webhook %q failed: %v", webhook, err)
 			continue
 		}
-		n.logger.Printf("notifier: webhook %q delivered channel=%q item=%q bytes=%d",
+		n.log.Infof(ctx, "notifier: webhook %q delivered channel=%q item=%q bytes=%d",
 			webhook, channel, id, len(body))
 	}
 }
