@@ -21,8 +21,10 @@ import (
 )
 
 const (
-	defaultBaseURL = "https://api.x.com/2"
-	timeoutSeconds = 30
+	defaultBaseURL                   = "https://api.x.com/2"
+	timeoutSeconds                   = 30
+	defaultUserCacheTTL              = 10 * time.Minute
+	defaultFilteredStreamBatchWindow = 3 * time.Second
 )
 
 var usernameRE = regexp.MustCompile(`^[A-Za-z0-9_]{1,15}$`)
@@ -37,8 +39,36 @@ type Service struct {
 	UseFilteredStream bool
 	// Limiter throttles outgoing HTTP requests. Nil disables throttling.
 	Limiter *RateLimiter
+	// UserCacheTTL controls user lookup cache lifetime.
+	// Zero or negative values fall back to a safe default.
+	UserCacheTTL time.Duration
+	// FilteredStreamBatchWindow controls how long filtered stream events are reused
+	// across sequential GetJSONFeed calls.
+	// Zero or negative values fall back to a safe default.
+	FilteredStreamBatchWindow time.Duration
 
 	streamMu sync.Mutex
+	userMu   sync.RWMutex
+
+	userCache          map[string]cachedUser
+	ensuredStreamRules map[string]struct{}
+	streamBatch        *cachedStreamBatch
+}
+
+type cachedUser struct {
+	data     userLookupResponse
+	cachedAt time.Time
+}
+
+type streamTweet struct {
+	ID        string `json:"id"`
+	Text      string `json:"text"`
+	CreatedAt string `json:"created_at"`
+}
+
+type cachedStreamBatch struct {
+	itemsByUsername map[string][]streamTweet
+	fetchedAt       time.Time
 }
 
 func NewService(token string, client *http.Client) *Service {
@@ -46,10 +76,14 @@ func NewService(token string, client *http.Client) *Service {
 		client = &http.Client{Timeout: timeoutSeconds * time.Second}
 	}
 	return &Service{
-		Client:  client,
-		BaseURL: defaultBaseURL,
-		Token:   token,
-		Now:     time.Now,
+		Client:                    client,
+		BaseURL:                   defaultBaseURL,
+		Token:                     token,
+		Now:                       time.Now,
+		UserCacheTTL:              defaultUserCacheTTL,
+		FilteredStreamBatchWindow: defaultFilteredStreamBatchWindow,
+		userCache:                 make(map[string]cachedUser),
+		ensuredStreamRules:        make(map[string]struct{}),
 	}
 }
 
@@ -61,7 +95,7 @@ func (s *Service) GetJSONFeed(username string) (string, error) {
 		return "", fmt.Errorf("invalid x.com username")
 	}
 
-	user, err := s.getUser(username)
+	user, err := s.getUserCached(username)
 	if err != nil {
 		return "", err
 	}
@@ -161,6 +195,40 @@ func (s *Service) getUser(username string) (*userLookupResponse, error) {
 	return &parsed, nil
 }
 
+func (s *Service) getUserCached(username string) (*userLookupResponse, error) {
+	ttl := s.UserCacheTTL
+	if ttl <= 0 {
+		ttl = defaultUserCacheTTL
+	}
+	key := strings.ToLower(username)
+	now := s.Now()
+
+	s.userMu.RLock()
+	cached, ok := s.userCache[key]
+	s.userMu.RUnlock()
+	if ok && now.Sub(cached.cachedAt) <= ttl {
+		copy := cached.data
+		return &copy, nil
+	}
+
+	user, err := s.getUser(username)
+	if err != nil {
+		return nil, err
+	}
+
+	s.userMu.Lock()
+	if s.userCache == nil {
+		s.userCache = make(map[string]cachedUser)
+	}
+	s.userCache[key] = cachedUser{
+		data:     *user,
+		cachedAt: now,
+	}
+	s.userMu.Unlock()
+
+	return user, nil
+}
+
 func (s *Service) getTweets(userID string) (*tweetsResponse, error) {
 	endpoint := strings.TrimRight(s.BaseURL, "/") + "/users/" + url.PathEscape(userID) + "/tweets?max_results=10&tweet.fields=created_at"
 	var parsed tweetsResponse
@@ -174,10 +242,74 @@ func (s *Service) getTweetsFromFilteredStream(username string) (*tweetsResponse,
 	s.streamMu.Lock()
 	defer s.streamMu.Unlock()
 
-	if err := s.ensureStreamRule(username); err != nil {
+	if s.ensuredStreamRules == nil {
+		s.ensuredStreamRules = make(map[string]struct{})
+	}
+
+	normalized := strings.ToLower(username)
+	if s.hasFreshStreamBatch() {
+		if err := s.ensureStreamRuleCached(normalized, username); err != nil {
+			return nil, err
+		}
+		return s.tweetsForUsernameFromBatch(normalized), nil
+	}
+
+	if err := s.ensureStreamRuleCached(normalized, username); err != nil {
 		return nil, err
 	}
 
+	batch, err := s.fetchFilteredStreamBatch()
+	if err != nil {
+		return nil, err
+	}
+	s.streamBatch = batch
+	return s.tweetsForUsernameFromBatch(normalized), nil
+}
+
+func (s *Service) hasFreshStreamBatch() bool {
+	if s.streamBatch == nil {
+		return false
+	}
+	window := s.FilteredStreamBatchWindow
+	if window <= 0 {
+		window = defaultFilteredStreamBatchWindow
+	}
+	return s.Now().Sub(s.streamBatch.fetchedAt) <= window
+}
+
+func (s *Service) ensureStreamRuleCached(cacheKey, ruleUsername string) error {
+	if _, ok := s.ensuredStreamRules[cacheKey]; ok {
+		return nil
+	}
+	if err := s.ensureStreamRule(ruleUsername); err != nil {
+		return err
+	}
+	s.ensuredStreamRules[cacheKey] = struct{}{}
+	return nil
+}
+
+func (s *Service) tweetsForUsernameFromBatch(username string) *tweetsResponse {
+	items := s.streamBatch.itemsByUsername[username]
+	out := make([]struct {
+		ID        string `json:"id"`
+		Text      string `json:"text"`
+		CreatedAt string `json:"created_at"`
+	}, 0, len(items))
+	for _, item := range items {
+		out = append(out, struct {
+			ID        string `json:"id"`
+			Text      string `json:"text"`
+			CreatedAt string `json:"created_at"`
+		}{
+			ID:        item.ID,
+			Text:      item.Text,
+			CreatedAt: item.CreatedAt,
+		})
+	}
+	return &tweetsResponse{Data: out}
+}
+
+func (s *Service) fetchFilteredStreamBatch() (*cachedStreamBatch, error) {
 	endpoint := strings.TrimRight(s.BaseURL, "/") + "/tweets/search/stream?tweet.fields=created_at,author_id&expansions=author_id&user.fields=username"
 	streamTimeout := s.Client.Timeout
 	if streamTimeout <= 0 {
@@ -206,15 +338,14 @@ func (s *Service) getTweetsFromFilteredStream(username string) (*tweetsResponse,
 		return nil, fmt.Errorf("x.com API request failed with status %d", res.StatusCode)
 	}
 
-	items := make([]struct {
-		ID        string `json:"id"`
-		Text      string `json:"text"`
-		CreatedAt string `json:"created_at"`
-	}, 0)
-	if err := s.consumeStream(res.Body, username, &items); err != nil {
+	itemsByUsername := make(map[string][]streamTweet)
+	if err := s.consumeStreamBatch(res.Body, itemsByUsername); err != nil {
 		return nil, err
 	}
-	return &tweetsResponse{Data: items}, nil
+	return &cachedStreamBatch{
+		itemsByUsername: itemsByUsername,
+		fetchedAt:       s.Now(),
+	}, nil
 }
 
 func (s *Service) ensureStreamRule(username string) error {
@@ -268,11 +399,7 @@ func (s *Service) ensureStreamRule(username string) error {
 	return nil
 }
 
-func (s *Service) consumeStream(body io.Reader, username string, out *[]struct {
-	ID        string `json:"id"`
-	Text      string `json:"text"`
-	CreatedAt string `json:"created_at"`
-}) error {
+func (s *Service) consumeStreamBatch(body io.Reader, out map[string][]streamTweet) error {
 	scanner := bufio.NewScanner(body)
 	const streamPrefix = "data:"
 	for scanner.Scan() {
@@ -293,22 +420,18 @@ func (s *Service) consumeStream(body io.Reader, username string, out *[]struct {
 			continue
 		}
 
-		matched := false
+		authorUsername := ""
 		for _, user := range event.Includes.Users {
-			if strings.EqualFold(user.Username, username) && user.ID == event.Data.AuthorID {
-				matched = true
+			if strings.EqualFold(user.ID, event.Data.AuthorID) {
+				authorUsername = strings.ToLower(strings.TrimSpace(user.Username))
 				break
 			}
 		}
-		if !matched {
+		if authorUsername == "" {
 			continue
 		}
 
-		*out = append(*out, struct {
-			ID        string `json:"id"`
-			Text      string `json:"text"`
-			CreatedAt string `json:"created_at"`
-		}{
+		out[authorUsername] = append(out[authorUsername], streamTweet{
 			ID:        event.Data.ID,
 			Text:      event.Data.Text,
 			CreatedAt: event.Data.CreatedAt,

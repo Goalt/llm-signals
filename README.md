@@ -194,6 +194,7 @@ go run ./cmd/server
 - `X_USERS` (optional): comma-separated list of x.com usernames to poll.
 - `X_BEARER_TOKEN` (required when `X_USERS` is set): x.com API bearer token.
 - `X_FILTERED_STREAM` (optional, default `false`): enable X API v2 Filtered Stream mode for x.com fetches.
+  - In this mode, sequential per-user polls reuse a shared short-lived stream batch and cache user lookups/rule checks, which typically means fewer X API requests and lower cost.
 - `WEBHOOKS` (required): comma-separated webhook URLs (shared with Telegram notifier).
 - `X_POLL_INTERVAL` (optional, default `5m`): polling interval as a Go duration.
 
