@@ -66,9 +66,11 @@ func (s *Service) GetJSONFeed(username string) (string, error) {
 		return "", err
 	}
 
-	tweets, err := s.getTweets(user.Data.ID)
+	var tweets *tweetsResponse
 	if s.UseFilteredStream {
 		tweets, err = s.getTweetsFromFilteredStream(user.Data.Username)
+	} else {
+		tweets, err = s.getTweets(user.Data.ID)
 	}
 	if err != nil {
 		return "", err
@@ -177,14 +179,23 @@ func (s *Service) getTweetsFromFilteredStream(username string) (*tweetsResponse,
 	}
 
 	endpoint := strings.TrimRight(s.BaseURL, "/") + "/tweets/search/stream?tweet.fields=created_at,author_id&expansions=author_id&user.fields=username"
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, endpoint, nil)
+	streamTimeout := s.Client.Timeout
+	if streamTimeout <= 0 {
+		streamTimeout = timeoutSeconds * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), streamTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+s.Token)
 	req.Header.Set("User-Agent", "tg-channel-to-rss")
 
-	s.Limiter.Wait()
+	if s.Limiter != nil {
+		s.Limiter.Wait()
+	}
 
 	res, err := s.Client.Do(req)
 	if err != nil {
@@ -242,7 +253,9 @@ func (s *Service) ensureStreamRule(username string) error {
 	req.Header.Set("User-Agent", "tg-channel-to-rss")
 	req.Header.Set("Content-Type", "application/json")
 
-	s.Limiter.Wait()
+	if s.Limiter != nil {
+		s.Limiter.Wait()
+	}
 
 	res, err := s.Client.Do(req)
 	if err != nil {
@@ -325,7 +338,9 @@ func (s *Service) getJSON(endpoint string, out any) error {
 	req.Header.Set("Authorization", "Bearer "+s.Token)
 	req.Header.Set("User-Agent", "tg-channel-to-rss")
 
-	s.Limiter.Wait()
+	if s.Limiter != nil {
+		s.Limiter.Wait()
+	}
 
 	res, err := s.Client.Do(req)
 	if err != nil {
