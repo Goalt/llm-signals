@@ -25,6 +25,8 @@ type Service struct {
 	BaseURL string
 	Token   string
 	Now     func() time.Time
+	// Limiter throttles outgoing HTTP requests. Nil disables throttling.
+	Limiter *RateLimiter
 }
 
 func NewService(token string, client *http.Client) *Service {
@@ -135,6 +137,8 @@ func (s *Service) getJSON(endpoint string, out any) error {
 	}
 	req.Header.Set("Authorization", "Bearer "+s.Token)
 	req.Header.Set("User-Agent", "tg-channel-to-rss")
+
+	s.Limiter.Wait()
 
 	res, err := s.Client.Do(req)
 	if err != nil {
