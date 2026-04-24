@@ -90,6 +90,18 @@ func (s *Service) GetJSONFeed(username string) (string, error) {
 			Created:     createdAt,
 			ID:          tweet.ID,
 			Content:     escaped,
+			Metadata: map[string]any{
+				"tweet_id":   tweet.ID,
+				"text":       tweet.Text,
+				"created_at": tweet.CreatedAt,
+				"tweet_url":  tweetLink,
+				"author": map[string]any{
+					"id":          user.Data.ID,
+					"name":        user.Data.Name,
+					"username":    user.Data.Username,
+					"description": user.Data.Description,
+				},
+			},
 		})
 	}
 
@@ -122,13 +134,34 @@ func (s *Service) buildFeedFromStream(username string) (string, error) {
 			created = s.Now()
 		}
 		escaped := html.EscapeString(t.Text)
+		tweetLink := "https://x.com/" + canonical + "/status/" + t.ID
+		author := map[string]any{
+			"username": canonical,
+		}
+		if meta.ID != "" {
+			author["id"] = meta.ID
+		}
+		if meta.Description != "" {
+			author["description"] = meta.Description
+		}
+		md := map[string]any{
+			"tweet_id":  t.ID,
+			"text":      t.Text,
+			"tweet_url": tweetLink,
+			"author":    author,
+			"source":    "stream",
+		}
+		if !t.CreatedAt.IsZero() {
+			md["created_at"] = t.CreatedAt.Format(time.RFC3339)
+		}
 		feed.Items = append(feed.Items, app.FeedItemJSON{
 			Title:       "New post from @" + canonical,
 			Description: "<p>" + escaped + "</p>",
-			Link:        "https://x.com/" + canonical + "/status/" + t.ID,
+			Link:        tweetLink,
 			Created:     created,
 			ID:          t.ID,
 			Content:     escaped,
+			Metadata:    md,
 		})
 	}
 	out, err := json.Marshal(feed)

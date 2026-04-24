@@ -90,6 +90,7 @@ func (s *Service) GetJSONFeed(channel string) (string, error) {
 			Created:     s.marketTime(market),
 			ID:          id,
 			Content:     safeContent,
+			Metadata:    marketMetadata(market, itemLink),
 		})
 	}
 
@@ -120,6 +121,37 @@ type market struct {
 	Description             string `json:"description"`
 	EndDateISO              string `json:"end_date_iso"`
 	AcceptingOrderTimestamp string `json:"accepting_order_timestamp"`
+}
+
+// marketMetadata returns the raw upstream market fields as a generic map so
+// webhook consumers receive the maximum data available from Polymarket.
+func marketMetadata(m market, itemLink string) map[string]any {
+	md := map[string]any{}
+	if m.ConditionID != "" {
+		md["condition_id"] = m.ConditionID
+	}
+	if m.QuestionID != "" {
+		md["question_id"] = m.QuestionID
+	}
+	if m.MarketSlug != "" {
+		md["market_slug"] = m.MarketSlug
+	}
+	if m.Question != "" {
+		md["question"] = m.Question
+	}
+	if m.Description != "" {
+		md["description"] = m.Description
+	}
+	if m.EndDateISO != "" {
+		md["end_date_iso"] = m.EndDateISO
+	}
+	if m.AcceptingOrderTimestamp != "" {
+		md["accepting_order_timestamp"] = m.AcceptingOrderTimestamp
+	}
+	if itemLink != "" {
+		md["event_url"] = itemLink
+	}
+	return md
 }
 
 func (s *Service) resolveEndpoint(channel string) (string, string, string, error) {

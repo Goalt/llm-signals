@@ -41,6 +41,7 @@ func runTestWebhook(args []string) int {
 		sourceURL  = fs.String("source-url", "", "source URL placed in payload (default: https://t.me/s/<channel>)")
 		deliveryID = fs.String("delivery-id", "", "unique delivery id placed in payload (default: timestamp-based)")
 		timeout    = fs.Duration("timeout", 10*time.Second, "per-request HTTP timeout")
+		metaFlag   = fs.String("metadata", "", "JSON object merged into item.metadata (default: source-specific sample)")
 	)
 
 	if err := fs.Parse(args); err != nil {
@@ -76,6 +77,12 @@ func runTestWebhook(args []string) int {
 		delivery = fmt.Sprintf("test-delivery-%d", now.UnixNano())
 	}
 
+	metadata, err := buildTestMetadata(*metaFlag, *sourceType, *channel, *text, *title, *link, id, srcURL, now)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "test-webhook: invalid -metadata: %v\n", err)
+		return 2
+	}
+
 	payload := notifier.Payload{
 		ID:         delivery,
 		SourceType: *sourceType,
@@ -88,6 +95,7 @@ func runTestWebhook(args []string) int {
 			Created:     now,
 			ID:          id,
 			Content:     *text,
+			Metadata:    metadata,
 		},
 	}
 
@@ -144,4 +152,63 @@ func truncate(s string, max int) string {
 		return s
 	}
 	return s[:max] + "…"
+}
+
+// buildTestMetadata assembles item.metadata for the synthetic webhook payload.
+// If override is provided it must be a JSON object; its keys override the
+// source-specific defaults. When override is empty a representative sample
+// matching the real notifier output for the given sourceType is returned.
+func buildTestMetadata(override, sourceType, channel, text, title, link, id, sourceURL string, now time.Time) (map[string]any, error) {
+	meta := defaultTestMetadata(sourceType, channel, text, title, link, id, sourceURL, now)
+	if strings.TrimSpace(override) == "" {
+		return meta, nil
+	}
+	var extra map[string]any
+	if err := json.Unmarshal([]byte(override), &extra); err != nil {
+		return nil, fmt.Errorf("parse metadata JSON: %w", err)
+	}
+	for k, v := range extra {
+		meta[k] = v
+	}
+	return meta, nil
+}
+
+func defaultTestMetadata(sourceType, channel, text, title, link, id, sourceURL string, now time.Time) map[string]any {
+	ts := now.Format(time.RFC3339)
+	switch sourceType {
+	case notifier.SourceTypeX:
+		return map[string]any{
+			"tweet_id":   id,
+			"text":       text,
+			"created_at": ts,
+			"tweet_url":  link,
+			"author": map[string]any{
+				"id":          "0",
+				"name":        channel,
+				"username":    channel,
+				"description": "test user",
+			},
+			"source": "test-webhook",
+		}
+	case notifier.SourceTypePolymarket:
+		return map[string]any{
+			"condition_id":              id,
+			"question_id":               id,
+			"market_slug":               channel,
+			"question":                  title,
+			"description":               text,
+			"end_date_iso":              ts,
+			"accepting_order_timestamp": ts,
+			"event_url":                 link,
+		}
+	default:
+		return map[string]any{
+			"channel":      channel,
+			"post_link":    link,
+			"published_at": ts,
+			"plain_text":   text,
+			"author":       channel,
+			"views":        "0",
+		}
+	}
 }

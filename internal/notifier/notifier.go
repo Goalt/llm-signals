@@ -162,7 +162,7 @@ func (n *Notifier) pollChannel(ctx context.Context, channel string, seed bool) {
 			id = latest.Link
 		}
 	} else {
-		n.log.Infof(ctx, "notifier: debug %q feed has no items", channel)
+		// n.log.Infof(ctx, "notifier: debug %q feed has no items", channel)
 	}
 
 	n.mu.Lock()

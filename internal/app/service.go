@@ -46,6 +46,10 @@ type FeedItemJSON struct {
 	ID          string             `json:"id"`
 	Content     string             `json:"content"`
 	Enclosure   *FeedEnclosureJSON `json:"enclosure,omitempty"`
+	// Metadata carries source-specific raw fields captured at fetch time so
+	// downstream consumers (webhooks) receive the maximum amount of data
+	// available from the upstream source without having to re-query it.
+	Metadata map[string]any `json:"metadata,omitempty"`
 }
 
 type FeedEnclosureJSON struct {
@@ -200,6 +204,39 @@ func buildItem(bubble *goquery.Selection, channelName string) *FeedItemJSON {
 	if len(photos) > 0 {
 		item.Enclosure = &FeedEnclosureJSON{URL: photos[0], Length: "0", Type: guessMIME(photos[0])}
 	}
+
+	meta := map[string]any{
+		"channel":      channelName,
+		"post_link":    link,
+		"published_at": pub.Format(time.RFC3339),
+	}
+	if plainText != "" {
+		meta["plain_text"] = plainText
+	}
+	if rawHTML != "" {
+		meta["raw_html"] = rawHTML
+	}
+	if len(photos) > 0 {
+		meta["photos"] = photos
+	}
+	if views := strings.TrimSpace(bubble.Find("span.tgme_widget_message_views").First().Text()); views != "" {
+		meta["views"] = views
+	}
+	if author := strings.TrimSpace(bubble.Find("a.tgme_widget_message_owner_name").First().Text()); author != "" {
+		meta["author"] = author
+	}
+	if fwd := strings.TrimSpace(bubble.Find("a.tgme_widget_message_forwarded_from_name").First().Text()); fwd != "" {
+		meta["forwarded_from"] = fwd
+	}
+	if reply, ok := bubble.Find("a.tgme_widget_message_reply[href]").First().Attr("href"); ok {
+		if reply = strings.TrimSpace(reply); reply != "" {
+			meta["reply_to"] = reply
+		}
+	}
+	if edited := strings.TrimSpace(bubble.Find("span.tgme_widget_message_meta time.time").First().AttrOr("datetime", "")); edited != "" && edited != pub.Format(time.RFC3339) {
+		meta["edited_at"] = edited
+	}
+	item.Metadata = meta
 	return item
 }
 
