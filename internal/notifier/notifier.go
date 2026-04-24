@@ -22,6 +22,12 @@ import (
 // SourceTypeTelegram identifies a Telegram public channel as the post source.
 const SourceTypeTelegram = "telegram"
 
+// SourceTypeX identifies an X (Twitter) account as the post source.
+const SourceTypeX = "x"
+
+// SourceTypePolymarket identifies a Polymarket feed as the post source.
+const SourceTypePolymarket = "polymarket"
+
 // FeedFetcher fetches the current JSON feed for a single Telegram channel.
 // It is satisfied by *app.Service but kept as an interface for testability.
 type FeedFetcher interface {
@@ -30,6 +36,8 @@ type FeedFetcher interface {
 
 // Config describes notifier runtime parameters.
 type Config struct {
+	// SourceType identifies the kind of source ("telegram", "x", "polymarket").
+	SourceType string
 	// Channels is the list of Telegram channel names to poll.
 	Channels []string
 	// Webhooks is the list of HTTP endpoints to POST new-post payloads to.
@@ -50,7 +58,7 @@ type Payload struct {
 	// SourceType identifies the kind of source the post came from (e.g. "telegram").
 	SourceType string `json:"source_type"`
 	// SourceURL is the canonical URL of the source (e.g. the channel page).
-	SourceURL string `json:"source_url"`
+	SourceURL string           `json:"source_url"`
 	Channel   string           `json:"channel"`
 	Item      app.FeedItemJSON `json:"item"`
 }
@@ -197,7 +205,7 @@ func (n *Notifier) pollChannel(ctx context.Context, channel string, seed bool) {
 func (n *Notifier) dispatch(ctx context.Context, channel, sourceURL string, item app.FeedItemJSON) {
 	payload := Payload{
 		ID:         newDeliveryID(),
-		SourceType: SourceTypeTelegram,
+		SourceType: n.cfg.SourceType,
 		SourceURL:  sourceURL,
 		Channel:    channel,
 		Item:       item,

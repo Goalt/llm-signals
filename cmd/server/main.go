@@ -15,6 +15,7 @@ import (
 	applog "github.com/Goalt/logger/logger"
 	"github.com/Goalt/tg-channel-to-rss/internal/app"
 	"github.com/Goalt/tg-channel-to-rss/internal/notifier"
+	"github.com/Goalt/tg-channel-to-rss/internal/polymarket"
 	"github.com/Goalt/tg-channel-to-rss/internal/xapi"
 )
 
@@ -51,6 +52,8 @@ func main() {
 	)
 
 	ctx := context.Background()
+
+	applog.InitSentry(envOrDefault("SENTRY_DSN", ""), 5*time.Second)
 
 	host := envOrDefault("HOST", "0.0.0.0")
 	port, err := strconv.Atoi(envOrDefault("PORT", "8000"))
@@ -124,6 +127,7 @@ func main() {
 
 	startNotifier(runCtx, svc)
 	startXNotifier(runCtx)
+	startPolymarketNotifier(runCtx)
 
 	addr := host + ":" + strconv.Itoa(port)
 	srv := &http.Server{
@@ -186,6 +190,7 @@ func startNotifier(ctx context.Context, fetcher notifier.FeedFetcher) {
 	}
 
 	n := notifier.New(notifier.Config{
+		SourceType:  notifier.SourceTypeTelegram,
 		Channels:    channels,
 		Webhooks:    webhooks,
 		Interval:    interval,
@@ -230,17 +235,76 @@ func startXNotifier(ctx context.Context) {
 	if minRequestInterval > 0 {
 		fetcher.Limiter = xapi.NewRateLimiter(minRequestInterval)
 	}
+
+	// Open a long-lived filtered stream once at startup. Feed polls then drain
+	// buffered tweets from memory instead of issuing outbound requests per
+	// channel poll.
+	stream := xapi.NewStream(token, nil)
+	stream.Logf = func(format string, args ...any) {
+		log.Infof(ctx, format, args...)
+	}
+	if err := stream.Start(ctx, users); err != nil {
+		log.Errorf(ctx, "x.com stream: start failed: %v", err)
+		os.Exit(1)
+	}
+	fetcher.Stream = stream
+
 	n := notifier.New(notifier.Config{
+		SourceType:  notifier.SourceTypeX,
 		Channels:    users,
 		Webhooks:    webhooks,
 		Interval:    interval,
 		HTTPTimeout: 30 * time.Second,
 	}, fetcher, nil, log)
 
-	log.Infof(ctx, "x.com notifier: polling %d user(s) every %s, dispatching to %d webhook(s) (min request interval: %s)", len(users), interval, len(webhooks), minRequestInterval)
+	log.Infof(ctx, "x.com notifier: streaming %d user(s), flushing every %s to %d webhook(s) (min request interval: %s)", len(users), interval, len(webhooks), minRequestInterval)
 	go func() {
 		if err := n.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 			log.Errorf(ctx, "x.com notifier stopped: %v", err)
+		}
+	}()
+}
+
+func startPolymarketNotifier(ctx context.Context) {
+	channels := splitList(os.Getenv("POLYMARKET_CHANNELS"))
+	webhooks := splitList(os.Getenv("WEBHOOKS"))
+	baseURL := envOrDefault("POLYMARKET_API_BASE_URL", "https://clob.polymarket.com")
+	auth := strings.TrimSpace(os.Getenv("POLYMARKET_AUTHORIZATION"))
+
+	if len(channels) == 0 || len(webhooks) == 0 {
+		log.Infof(ctx, "polymarket notifier disabled: set POLYMARKET_CHANNELS and WEBHOOKS to enable")
+		return
+	}
+
+	interval, err := time.ParseDuration(envOrDefault("POLYMARKET_POLL_INTERVAL", "5m"))
+	if err != nil {
+		log.Errorf(ctx, "invalid POLYMARKET_POLL_INTERVAL: %v", err)
+		os.Exit(1)
+	}
+
+	minRequestInterval, err := time.ParseDuration(envOrDefault("POLYMARKET_MIN_REQUEST_INTERVAL", "1s"))
+	if err != nil {
+		log.Errorf(ctx, "invalid POLYMARKET_MIN_REQUEST_INTERVAL: %v", err)
+		os.Exit(1)
+	}
+
+	fetcher := polymarket.NewService(auth, nil)
+	fetcher.BaseURL = baseURL
+	if minRequestInterval > 0 {
+		fetcher.Limiter = xapi.NewRateLimiter(minRequestInterval)
+	}
+	n := notifier.New(notifier.Config{
+		SourceType:  notifier.SourceTypePolymarket,
+		Channels:    channels,
+		Webhooks:    webhooks,
+		Interval:    interval,
+		HTTPTimeout: 30 * time.Second,
+	}, fetcher, nil, log)
+
+	log.Infof(ctx, "polymarket notifier: polling %d endpoint(s) every %s, dispatching to %d webhook(s) (min request interval: %s)", len(channels), interval, len(webhooks), minRequestInterval)
+	go func() {
+		if err := n.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			log.Errorf(ctx, "polymarket notifier stopped: %v", err)
 		}
 	}()
 }

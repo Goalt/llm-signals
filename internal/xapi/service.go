@@ -27,6 +27,10 @@ type Service struct {
 	Now     func() time.Time
 	// Limiter throttles outgoing HTTP requests. Nil disables throttling.
 	Limiter *RateLimiter
+	// Stream, when set, makes GetJSONFeed return tweets accumulated from the
+	// live filtered stream since the previous call instead of performing
+	// outbound HTTP requests. The buffer is cleared after each drain.
+	Stream *Stream
 }
 
 func NewService(token string, client *http.Client) *Service {
@@ -47,6 +51,10 @@ func (s *Service) GetJSONFeed(username string) (string, error) {
 	}
 	if !usernameRE.MatchString(username) {
 		return "", fmt.Errorf("invalid x.com username")
+	}
+
+	if s.Stream != nil {
+		return s.buildFeedFromStream(username)
 	}
 
 	user, err := s.getUser(username)
@@ -85,6 +93,44 @@ func (s *Service) GetJSONFeed(username string) (string, error) {
 		})
 	}
 
+	out, err := json.Marshal(feed)
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+// buildFeedFromStream assembles a feed from tweets the Stream has buffered
+// since the last call. After reading, the buffer is cleared so memory usage
+// stays bounded between polls.
+func (s *Service) buildFeedFromStream(username string) (string, error) {
+	meta, tweets := s.Stream.Drain(username)
+	canonical := meta.Username
+	if canonical == "" {
+		canonical = username
+	}
+	feed := app.FeedJSON{
+		Title:       "@" + canonical,
+		Link:        "https://x.com/" + canonical,
+		Description: meta.Description,
+		Created:     s.Now(),
+		Items:       make([]app.FeedItemJSON, 0, len(tweets)),
+	}
+	for _, t := range tweets {
+		created := t.CreatedAt
+		if created.IsZero() {
+			created = s.Now()
+		}
+		escaped := html.EscapeString(t.Text)
+		feed.Items = append(feed.Items, app.FeedItemJSON{
+			Title:       "New post from @" + canonical,
+			Description: "<p>" + escaped + "</p>",
+			Link:        "https://x.com/" + canonical + "/status/" + t.ID,
+			Created:     created,
+			ID:          t.ID,
+			Content:     escaped,
+		})
+	}
 	out, err := json.Marshal(feed)
 	if err != nil {
 		return "", err

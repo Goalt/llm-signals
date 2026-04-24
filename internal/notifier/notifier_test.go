@@ -58,9 +58,9 @@ func TestRunValidation(t *testing.T) {
 		name string
 		cfg  Config
 	}{
-		{"no channels", Config{Webhooks: []string{"http://x"}, Interval: time.Second}},
-		{"no webhooks", Config{Channels: []string{"a"}, Interval: time.Second}},
-		{"no interval", Config{Channels: []string{"a"}, Webhooks: []string{"http://x"}}},
+		{"no channels", Config{SourceType: SourceTypeTelegram, Webhooks: []string{"http://x"}, Interval: time.Second}},
+		{"no webhooks", Config{SourceType: SourceTypeTelegram, Channels: []string{"a"}, Interval: time.Second}},
+		{"no interval", Config{SourceType: SourceTypeTelegram, Channels: []string{"a"}, Webhooks: []string{"http://x"}}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -118,9 +118,10 @@ func TestSeedAndDispatchNewItems(t *testing.T) {
 	})
 
 	n := New(Config{
-		Channels: []string{"chan1"},
-		Webhooks: []string{hook.URL, hook2.URL},
-		Interval: time.Hour, // not used; we drive ticks manually
+		SourceType: SourceTypeTelegram,
+		Channels:   []string{"chan1"},
+		Webhooks:   []string{hook.URL, hook2.URL},
+		Interval:   time.Hour, // not used; we drive ticks manually
 	}, stub, http.DefaultClient, nil)
 
 	ctx := context.Background()
@@ -198,9 +199,10 @@ func TestFetchErrorIsLoggedNotFatal(t *testing.T) {
 	defer hook.Close()
 
 	n := New(Config{
-		Channels: []string{"bad", "good"},
-		Webhooks: []string{hook.URL},
-		Interval: time.Hour,
+		SourceType: SourceTypeTelegram,
+		Channels:   []string{"bad", "good"},
+		Webhooks:   []string{hook.URL},
+		Interval:   time.Hour,
 	}, stub, http.DefaultClient, nil)
 
 	// Seed — both channels polled, no webhook fired.

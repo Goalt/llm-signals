@@ -158,6 +158,7 @@ func main() {
 	})
 
 	n1 := notifier.New(notifier.Config{
+		SourceType:  notifier.SourceTypeTelegram,
 		Channels:    []string{"chanA"},
 		Webhooks:    []string{hookA.srv.URL, hookB.srv.URL},
 		Interval:    100 * time.Millisecond,
@@ -218,6 +219,7 @@ func main() {
 	})
 
 	n2 := notifier.New(notifier.Config{
+		SourceType:  notifier.SourceTypeTelegram,
 		Channels:    []string{"bad", "ok"},
 		Webhooks:    []string{hookC.srv.URL},
 		Interval:    100 * time.Millisecond,
@@ -254,9 +256,9 @@ func main() {
 		name string
 		cfg  notifier.Config
 	}{
-		{"no channels", notifier.Config{Webhooks: []string{"http://x"}, Interval: time.Second}},
-		{"no webhooks", notifier.Config{Channels: []string{"a"}, Interval: time.Second}},
-		{"non-positive interval", notifier.Config{Channels: []string{"a"}, Webhooks: []string{"http://x"}}},
+		{"no channels", notifier.Config{SourceType: notifier.SourceTypeTelegram, Webhooks: []string{"http://x"}, Interval: time.Second}},
+		{"no webhooks", notifier.Config{SourceType: notifier.SourceTypeTelegram, Channels: []string{"a"}, Interval: time.Second}},
+		{"non-positive interval", notifier.Config{SourceType: notifier.SourceTypeTelegram, Channels: []string{"a"}, Webhooks: []string{"http://x"}}},
 	}
 	for _, c := range cases {
 		n := notifier.New(c.cfg, newFakeFetcher(), nil, nil)

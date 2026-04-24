@@ -206,3 +206,25 @@ new post to every configured webhook:
   "item": { "title": "...", "link": "...", "created": "...", "id": "...", "content": "..." }
 }
 ```
+
+## Polymarket notifier module
+
+This notifier polls the Polymarket API for new events and forwards each
+discovery to a list of webhooks. It shares the same webhook payload format
+as the Telegram and x.com notifiers.
+
+### Run with Polymarket notifier enabled
+```bash
+POLYMARKET_CHANNELS=sampling-markets,markets \
+WEBHOOKS=https://example.com/hook1,https://example.com/hook2 \
+POLYMARKET_POLL_INTERVAL=5m \
+go run ./cmd/server
+```
+
+### Environment variables
+- `POLYMARKET_CHANNELS` (optional): comma-separated list of Polymarket API endpoints to poll (e.g., `sampling-markets`, `markets`).
+- `WEBHOOKS` (required): comma-separated webhook URLs (shared with other notifiers).
+- `POLYMARKET_POLL_INTERVAL` (optional, default `5m`): polling interval as a Go duration.
+- `POLYMARKET_MIN_REQUEST_INTERVAL` (optional, default `1s`): minimum interval between API requests to throttle rate-limit exposure.
+- `POLYMARKET_API_BASE_URL` (optional, default `https://clob.polymarket.com`): upstream Polymarket API base URL.
+- `POLYMARKET_AUTHORIZATION` (optional): `Authorization` header value injected for upstream requests.

@@ -66,9 +66,9 @@ func TestNotifier_Run_ValidatesConfig(t *testing.T) {
 		name string
 		cfg  notifier.Config
 	}{
-		{"missing channels", notifier.Config{Webhooks: []string{"http://x"}, Interval: time.Second}},
-		{"missing webhooks", notifier.Config{Channels: []string{"a"}, Interval: time.Second}},
-		{"non-positive interval", notifier.Config{Channels: []string{"a"}, Webhooks: []string{"http://x"}}},
+		{"missing channels", notifier.Config{SourceType: notifier.SourceTypeTelegram, Webhooks: []string{"http://x"}, Interval: time.Second}},
+		{"missing webhooks", notifier.Config{SourceType: notifier.SourceTypeTelegram, Channels: []string{"a"}, Interval: time.Second}},
+		{"non-positive interval", notifier.Config{SourceType: notifier.SourceTypeTelegram, Channels: []string{"a"}, Webhooks: []string{"http://x"}}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -119,9 +119,10 @@ func TestNotifier_EndToEnd_DispatchesOnlyNewItemsToAllWebhooks(t *testing.T) {
 	})
 
 	n := notifier.New(notifier.Config{
-		Channels: []string{"chanA"},
-		Webhooks: []string{hookA.URL, hookB.URL},
-		Interval: 50 * time.Millisecond,
+		SourceType: notifier.SourceTypeTelegram,
+		Channels:   []string{"chanA"},
+		Webhooks:   []string{hookA.URL, hookB.URL},
+		Interval:   50 * time.Millisecond,
 	}, ff, http.DefaultClient, nil)
 
 	// Start notifier in background; after seed pass we mutate the feed.
@@ -178,9 +179,10 @@ func TestNotifier_FetchErrorDoesNotBlockOtherChannels(t *testing.T) {
 	defer hook.Close()
 
 	n := notifier.New(notifier.Config{
-		Channels: []string{"bad", "ok"},
-		Webhooks: []string{hook.URL},
-		Interval: 30 * time.Millisecond,
+		SourceType: notifier.SourceTypeTelegram,
+		Channels:   []string{"bad", "ok"},
+		Webhooks:   []string{hook.URL},
+		Interval:   30 * time.Millisecond,
 	}, ff, http.DefaultClient, nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -228,9 +230,10 @@ func TestNotifier_WebhookNon2xxIsLoggedNotFatal(t *testing.T) {
 	defer hook.Close()
 
 	n := notifier.New(notifier.Config{
-		Channels: []string{"c"},
-		Webhooks: []string{hook.URL},
-		Interval: 30 * time.Millisecond,
+		SourceType: notifier.SourceTypeTelegram,
+		Channels:   []string{"c"},
+		Webhooks:   []string{hook.URL},
+		Interval:   30 * time.Millisecond,
 	}, ff, http.DefaultClient, nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -274,9 +277,10 @@ func TestNotifier_ItemWithoutIDUsesLinkAsKey(t *testing.T) {
 	defer hook.Close()
 
 	n := notifier.New(notifier.Config{
-		Channels: []string{"c"},
-		Webhooks: []string{hook.URL},
-		Interval: 30 * time.Millisecond,
+		SourceType: notifier.SourceTypeTelegram,
+		Channels:   []string{"c"},
+		Webhooks:   []string{hook.URL},
+		Interval:   30 * time.Millisecond,
 	}, ff, http.DefaultClient, nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
