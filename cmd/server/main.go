@@ -98,6 +98,7 @@ func main() {
 		log.Errorf(ctx, "failed to initialize bybit proxy: %v", err)
 		os.Exit(1)
 	}
+	processAnalyzeHandler := newProcessAnalyzeHandler()
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/mcp" || strings.HasPrefix(r.URL.Path, "/mcp/") {
@@ -114,6 +115,10 @@ func main() {
 		}
 		if matchesProxyRoute(r.URL.Path, "/proxy/bybit") {
 			bybitProxy.ServeHTTP(w, r)
+			return
+		}
+		if r.URL.Path == "/process-analyze" || r.URL.Path == "/process-analyze/" {
+			processAnalyzeHandler.ServeHTTP(w, r)
 			return
 		}
 
@@ -348,6 +353,9 @@ Subcommands:
   mcp            Run the Model Context Protocol (MCP) server over stdio.
                  Suitable for use as a sub-process by MCP clients
                  (Claude Desktop, Cursor, etc.).
+
+HTTP routes:
+  POST /process-analyze  Run the Process + Analyze pipeline for a notifier payload.
 
 Environment variables are documented in .env.example.
 `)

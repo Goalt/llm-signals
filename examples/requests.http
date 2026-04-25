@@ -149,6 +149,33 @@ Content-Type: application/json; charset=UTF-8
 }
 
 # ────────────────────────────────────────────────────────────────────────────
+#  /process-analyze — synchronous Process + Analyze pipeline
+#  Requires PROCESS_ANALYZE_* env vars to be configured on the server.
+# ────────────────────────────────────────────────────────────────────────────
+
+### Process + Analyze: notifier payload -> Sheets + OpenRouter + Telegram
+POST {{host}}/process-analyze
+Content-Type: application/json
+
+{
+  "id": "delivery-1",
+  "source_type": "telegram",
+  "source_url": "https://t.me/s/durov",
+  "channel": "durov",
+  "item": {
+    "title": "New post in channel @durov",
+    "description": "<p>hello</p>",
+    "link": "https://t.me/s/durov/1",
+    "created": "2026-04-25T10:00:00Z",
+    "id": "https://t.me/s/durov/1",
+    "content": "Some headline [link] body",
+    "metadata": {
+      "views": "1234"
+    }
+  }
+}
+
+# ────────────────────────────────────────────────────────────────────────────
 #  /mcp — Model Context Protocol (MCP) server over HTTP
 #  JSON-RPC 2.0: initialize, tools/list, tools/call
 # ────────────────────────────────────────────────────────────────────────────

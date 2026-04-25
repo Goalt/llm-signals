@@ -87,7 +87,7 @@ curl -i 'http://localhost:8000/feed/nonexistent_channel_xyz'
 
 ```
 notifier: polling 2 channel(s) every 5m0s, dispatching to 1 webhook(s)
-x.com notifier: polling 1 user(s) every 5m0s, dispatching to 1 webhook(s)
+x.com notifier: streaming 1 user(s), flushing every 5m0s to 1 webhook(s) (min request interval: 1s)
 ```
 
 ### 5. (Опционально) Запустите тесты
@@ -106,6 +106,84 @@ bash tests/manual/notifier-wiring.sh
 
 Полный 7-слойный регресс описан в [.github/agents/api-integrator.agent.md](.github/agents/api-integrator.agent.md)
 и автоматизирован в [.github/workflows/agent-regression.yml](.github/workflows/agent-regression.yml).
+
+
+## Process + Analyze pipeline
+
+Репозиторий также умеет синхронно обрабатывать входящий webhook в стиле n8n
+"Process + Analyze":
+
+1. принимает notifier payload через `POST /process-analyze`
+2. пишет сырую новость в локальную SQLite-базу
+3. чистит текст от фрагментов в квадратных скобках
+4. отправляет новость в OpenRouter на анализ
+5. даёт модели tool-доступ к Polymarket Gamma events по tag slug
+6. отправляет итоговый текст в Telegram Bot
+7. обновляет поле `action` в записи SQLite
+
+### Входной payload
+
+Эндпоинт принимает тот же JSON, что и webhook payload нотификаторов:
+
+```json
+{
+  "id": "delivery-1",
+  "source_type": "telegram",
+  "source_url": "https://t.me/s/durov",
+  "channel": "durov",
+  "item": {
+    "title": "New post in channel @durov",
+    "description": "<p>hello</p>",
+    "link": "https://t.me/s/durov/1",
+    "created": "2026-04-25T10:00:00Z",
+    "id": "https://t.me/s/durov/1",
+    "content": "Some headline [link] body",
+    "metadata": {"views": "1234"}
+  }
+}
+```
+
+### Обязательные переменные окружения
+
+```bash
+PROCESS_ANALYZE_OPENROUTER_AUTHORIZATION='Bearer ...'
+PROCESS_ANALYZE_SQLITE_PATH='./process-analyze.db'
+PROCESS_ANALYZE_TELEGRAM_BOT_TOKEN='123456:abc'
+PROCESS_ANALYZE_TELEGRAM_CHAT_ID='201696516'
+```
+
+Остальные переменные (`*_API_BASE_URL`, `PROCESS_ANALYZE_OPENROUTER_MODEL`,
+`PROCESS_ANALYZE_SQLITE_TABLE`) описаны в `.env.example` и имеют
+дефолтные значения.
+
+### Smoke-check внешних зависимостей
+
+```bash
+go run ./cmd/process-analyze-check
+```
+
+Команда проверяет доступ к Polymarket Gamma, локальной SQLite-базе, Telegram Bot API
+и OpenRouter, не запуская основной сервер.
+
+### Пример вызова
+
+```bash
+curl -sS -X POST http://localhost:8000/process-analyze   -H 'Content-Type: application/json'   -d '{
+    "id":"delivery-1",
+    "source_type":"telegram",
+    "source_url":"https://t.me/s/durov",
+    "channel":"durov",
+    "item":{
+      "title":"New post in channel @durov",
+      "description":"<p>hello</p>",
+      "link":"https://t.me/s/durov/1",
+      "created":"2026-04-25T10:00:00Z",
+      "id":"https://t.me/s/durov/1",
+      "content":"Some headline [link] body",
+      "metadata":{"views":"1234"}
+    }
+  }'
+```
 
 ## MCP server
 

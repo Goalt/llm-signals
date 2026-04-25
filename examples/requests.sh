@@ -64,6 +64,12 @@ proxy_polymarket() {
   req GET "$HOST/proxy/polymarket/markets?next_cursor=MA%3D%3D&limit=10"
 }
 
+
+process_analyze() {
+  hr "process-analyze: notifier payload -> Sheets + OpenRouter + Telegram"
+  req POST "$HOST/process-analyze"     -H 'Content-Type: application/json'     -d '{"id":"delivery-1","source_type":"telegram","source_url":"https://t.me/s/durov","channel":"durov","item":{"title":"New post in channel @durov","description":"<p>hello</p>","link":"https://t.me/s/durov/1","created":"2026-04-25T10:00:00Z","id":"https://t.me/s/durov/1","content":"Some headline [link] body","metadata":{"views":"1234"}}}'
+}
+
 proxy_bybit() {
   hr "bybit: server time"
   req GET "$HOST/proxy/bybit/v5/market/time"
@@ -78,7 +84,7 @@ proxy_bybit() {
   req GET "$HOST/proxy/bybit/v5/market/orderbook?category=linear&symbol=BTCUSDT&limit=25"
 }
 
-all=(feed proxy-hyperliquid proxy-polymarket proxy-bybit)
+all=(feed proxy-hyperliquid proxy-polymarket proxy-bybit process-analyze)
 
 run() {
   case "$1" in
@@ -86,6 +92,7 @@ run() {
     proxy-hyperliquid) proxy_hyperliquid ;;
     proxy-polymarket)  proxy_polymarket ;;
     proxy-bybit)       proxy_bybit ;;
+    process-analyze)    process_analyze ;;
     *) echo "unknown group: $1 (available: ${all[*]})" >&2; return 2 ;;
   esac
 }

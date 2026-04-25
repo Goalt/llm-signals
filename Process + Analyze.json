@@ -1,0 +1,610 @@
+{
+  "name": "Process + Analyze",
+  "nodes": [
+    {
+      "parameters": {
+        "model": "tencent/hy3-preview:free",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        2672,
+        64
+      ],
+      "id": "d36ed72a-c1e7-4234-bd23-06dc7055c902",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "d1vN9yueUPhreK7N",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Call this tool to get list of events in Polymarket",
+        "jsCode": "const url = 'https://gamma-api.polymarket.com/events/keyset?limit=20&ascending=true&tag_slug=' + ($json.tag || '');\n\ntry {\n  const response = await this.helpers.httpRequest({\n    method: 'GET',\n    url: url\n  });\n  return JSON.stringify(response);\n} catch (error) {\n  return JSON.stringify({ error: error.message });\n}",
+        "specifyInputSchema": true,
+        "schemaType": "manual",
+        "inputSchema": "{\n\"type\": \"object\",\n\"properties\": {\n\t\"tag\": {\n\t\t\"type\": \"string\",\n\t\t\"description\": \"Tag of event to search\"\n\t\t}\n\t}\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        2800,
+        64
+      ],
+      "id": "f1b2475b-e3bd-470e-bb5f-25fd3f3b6819",
+      "name": "Code Tool"
+    },
+    {
+      "parameters": {
+        "chatId": "201696516",
+        "text": "=*Новость*: {{ $json.output.title }}\n\n*Действие*: {{ $json.output.action }}\n\n*Объяснение*: {{ $json.output.explanation }}\n\nТэги: {{ $json.output.tags }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3136,
+        -64
+      ],
+      "id": "0c9f39e2-5546-4c9e-ad03-8e27f527ffa1",
+      "name": "Send a text message",
+      "webhookId": "99010216-e93e-49cc-9cde-a69b85f7c472",
+      "credentials": {
+        "telegramApi": {
+          "id": "m2ZPz1eo6V1BgA7y",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1",
+              "name": "text",
+              "value": "={{ $json.text.replace(/\\[.*?\\]/g, \"\") }}",
+              "type": "string"
+            },
+            {
+              "id": "61f0b811-df7b-48bc-825e-fb6bfcea0627",
+              "name": "id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "ad59e79a-7c5f-4106-8688-7308d6eb0bf9",
+              "name": "metadata",
+              "value": "={{ $json.metadata }}",
+              "type": "object"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "dcaffad1-246d-417d-913a-a4cb1b696a4e",
+      "name": "Remove Links",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2224,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1",
+              "leftValue": "={{ $json.text }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              },
+              "rightValue": ""
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "278e29df-cc88-4ed1-81b3-f45e5802add5",
+      "name": "Filter Empty",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        2448,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Ты помощник по торговле на основание полученных новостей, какие можно сделать предложения по событиям на Polymarket исходя из этих новостей: {{ $json.text }}\n\nЕсли действие не нужно делать, то напиши - \"Игнорировать новость\"\n\nТакже вот тут хранится мета данные по новости {{ $json.metadata }}\n\nid новости {{ $json.id }}\n\nОтвечай полностью на русском\n\nДобавь также односложные тэги по этой новости в результа. Тэги должны быть разделены пробелом, начинаться с # и должно быть односложными\n\nОбъяснение действия должно быть простым 2-3 предложения",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        2736,
+        -160
+      ],
+      "id": "9525c7ef-76f5-4f89-be60-4f264d93ffef",
+      "name": "AI Agent1"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "1dd88190-5a66-4149-85bd-453f8a53b5b2",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        1552,
+        -160
+      ],
+      "id": "101ed4cc-ec5d-4bef-987d-3925df18c199",
+      "name": "Webhook",
+      "webhookId": "1dd88190-5a66-4149-85bd-453f8a53b5b2"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1KYs7e1xvJove_nJEK2jvVoTKlPbmInUoWCXjYgeHBig",
+          "mode": "list",
+          "cachedResultName": "news",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1KYs7e1xvJove_nJEK2jvVoTKlPbmInUoWCXjYgeHBig/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1KYs7e1xvJove_nJEK2jvVoTKlPbmInUoWCXjYgeHBig/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.body.id }}",
+            "text": "={{ $json.body.item.content }}",
+            "type": "={{ $json.body.source_type }}",
+            "source": "={{ $json.body.source_url }}",
+            "created_at": "={{ $json.created_at }}",
+            "updated_at": "={{ $json.updated_at }}",
+            "metadata": "={{ $json.body.item.metadata }}",
+            "action": "-"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "text",
+              "displayName": "text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "type",
+              "displayName": "type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "metadata",
+              "displayName": "metadata",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2000,
+        -160
+      ],
+      "id": "2e1868f7-cfb6-408e-9e72-a65bf8f57b05",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "lK2C2Y8iaVa5P0j6",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "7f752e93-f706-4817-95cd-b8b1ce6c3d91",
+              "name": "body",
+              "value": "={{ $json.body }}",
+              "type": "object"
+            },
+            {
+              "id": "23f3aa38-407a-4ec0-83ac-dfc12932bebd",
+              "name": "created_at",
+              "value": "={{Date.now()}}",
+              "type": "string"
+            },
+            {
+              "id": "e89e30ae-9f9e-4dbb-a27f-cad1a5f6bf29",
+              "name": "updated_at",
+              "value": "={{Date.now()}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1776,
+        -160
+      ],
+      "id": "cf7fe0ab-af34-403d-bcc3-7fd55ec786e1",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n\t\"title\": \"New coin in bybit listed\",\n\t\"id\": \"test-delivery-1777048762160305121\",\n    \"source\": \"https://t.me/s/test-channel\",\n    \"action\": \"Buy BTC for 1000 USD\",\n    \"explanation\": \"New coin will pump BTC\",\n  \"tags\": \"#politics, #crypto\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        2928,
+        64
+      ],
+      "id": "63e93685-ac86-4740-9eca-62019e2dad50",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1KYs7e1xvJove_nJEK2jvVoTKlPbmInUoWCXjYgeHBig",
+          "mode": "list",
+          "cachedResultName": "news",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1KYs7e1xvJove_nJEK2jvVoTKlPbmInUoWCXjYgeHBig/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "master",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1KYs7e1xvJove_nJEK2jvVoTKlPbmInUoWCXjYgeHBig/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.output.id }}",
+            "action": "={{ $json.output.action }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "text",
+              "displayName": "text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "type",
+              "displayName": "type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "metadata",
+              "displayName": "metadata",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        3136,
+        -256
+      ],
+      "id": "e94c3029-8dea-4b6d-bfaa-ffb69de72e97",
+      "name": "Update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "lK2C2Y8iaVa5P0j6",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Remove Links": {
+      "main": [
+        [
+          {
+            "node": "Filter Empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Empty": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message": {
+      "main": [
+        []
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Remove Links",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "0def1f52-a982-4da1-90cf-3bdcd0d0286d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "660f96ab8cfe9baa916a1c4025b27ebd65fa89ec2f968eecab2f7c28b6324b65"
+  },
+  "id": "yFzu6FUHBduYcOEq",
+  "tags": []
+}

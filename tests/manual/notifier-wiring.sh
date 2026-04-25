@@ -75,15 +75,15 @@ run_case "X_USERS without X_BEARER_TOKEN: x notifier disabled" \
   "^x.com notifier: polling" -- \
   X_USERS=jack WEBHOOKS=http://127.0.0.1:9/a --
 
-# 4) X_USERS + token + webhooks → x.com notifier enabled.
-run_case "X_USERS + token + WEBHOOKS: x notifier enabled" \
-  "x.com notifier: polling 1 user\(s\) every 10s.*1 webhook" \
+# 4) X_USERS + token + webhooks → x.com stream startup is attempted.
+run_case "X_USERS + token + WEBHOOKS: x stream startup attempted" \
+  "x.com stream: start failed" \
   "^x.com notifier disabled" -- \
   X_USERS=jack X_BEARER_TOKEN=fake-token WEBHOOKS=http://127.0.0.1:9/a X_POLL_INTERVAL=10s --
 
 # 5) Both notifiers enabled simultaneously.
 run_case "TG + X both enabled simultaneously" \
-  "notifier: polling 1 channel&&x.com notifier: polling 1 user" \
+  "notifier: polling 1 channel&&x.com stream: start failed" \
   "notifier disabled" -- \
   TG_CHANNELS=durov X_USERS=jack X_BEARER_TOKEN=fake-token \
   WEBHOOKS=http://127.0.0.1:9/a POLL_INTERVAL=10s X_POLL_INTERVAL=10s --

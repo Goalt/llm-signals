@@ -45,4 +45,6 @@ hit "bybit tickers"        GET  "$HOST/proxy/bybit/v5/market/tickers?category=li
 hit "bybit kline"          GET  "$HOST/proxy/bybit/v5/market/kline?category=linear&symbol=BTCUSDT&interval=60&limit=5"
 hit "bybit orderbook"      GET  "$HOST/proxy/bybit/v5/market/orderbook?category=linear&symbol=BTCUSDT&limit=25"
 
+hit "process analyze"      POST "$HOST/process-analyze" -H 'Content-Type: application/json' -d '{"id":"delivery-1","source_type":"telegram","source_url":"https://t.me/s/durov","channel":"durov","item":{"title":"New post in channel @durov","description":"<p>hello</p>","link":"https://t.me/s/durov/1","created":"2026-04-25T10:00:00Z","id":"https://t.me/s/durov/1","content":"Some headline [link] body","metadata":{"views":"1234"}}}'
+
 echo "log: $LOG  ($(wc -l < "$LOG") lines)"
