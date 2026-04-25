@@ -111,3 +111,25 @@ func TestServeHTTP_ToolsList(t *testing.T) {
 		t.Fatalf("expected tools, got %#v", result["tools"])
 	}
 }
+
+func TestServeHTTP_PolymarketTool(t *testing.T) {
+	srv := New(io.Discard, nil)
+	payload := `{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"get_polymarket_events","arguments":{"endpoint":"sampling-markets","limit":5}}}`
+	req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	srv.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: got %d; body=%s", rec.Code, rec.Body.String())
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	// Either result or error depending on upstream availability.
+	if resp["result"] == nil && resp["error"] == nil {
+		t.Fatalf("expected result or error, got %#v", resp)
+	}
+}

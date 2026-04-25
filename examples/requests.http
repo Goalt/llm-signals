@@ -147,3 +147,83 @@ Content-Type: application/json; charset=UTF-8
     }
   }
 }
+
+# ────────────────────────────────────────────────────────────────────────────
+#  /mcp — Model Context Protocol (MCP) server over HTTP
+#  JSON-RPC 2.0: initialize, tools/list, tools/call
+# ────────────────────────────────────────────────────────────────────────────
+
+### MCP: Initialize handshake
+POST {{host}}/mcp
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {}
+}
+
+### MCP: List available tools
+POST {{host}}/mcp
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/list"
+}
+
+### MCP tool: get_telegram_feed
+POST {{host}}/mcp
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {
+    "name": "get_telegram_feed",
+    "arguments": {
+      "channel": "durov"
+    }
+  }
+}
+
+### MCP tool: get_polymarket_events (minimal)
+POST {{host}}/mcp
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "tools/call",
+  "params": {
+    "name": "get_polymarket_events",
+    "arguments": {}
+  }
+}
+
+### MCP tool: get_polymarket_events (with filters)
+POST {{host}}/mcp
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "method": "tools/call",
+  "params": {
+    "name": "get_polymarket_events",
+    "arguments": {
+      "endpoint": "sampling-markets",
+      "limit": 5,
+      "closed": false
+    }
+  }
+}
+
+###
+
+curl -s -X POST http://localhost:8000/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_telegram_feed","arguments":{"channel":"durov"}}}'

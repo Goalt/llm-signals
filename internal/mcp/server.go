@@ -22,9 +22,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
 	"sync"
 
 	"github.com/Goalt/tg-channel-to-rss/internal/app"
+	"github.com/Goalt/tg-channel-to-rss/internal/polymarket"
 )
 
 const (
@@ -71,20 +74,22 @@ type toolResult struct {
 
 // Server is a stateless MCP server. Construct with New and drive with Serve.
 type Server struct {
-	app     *app.Service
-	tools   []toolDef
-	writeMu sync.Mutex
-	out     io.Writer
-	errOut  io.Writer
+	app        *app.Service
+	polymarket *polymarket.Service
+	tools      []toolDef
+	writeMu    sync.Mutex
+	out        io.Writer
+	errOut     io.Writer
 }
 
 // New returns a Server that writes JSON-RPC responses to out and unrecoverable
 // transport errors to errOut. errOut may be nil.
 func New(out, errOut io.Writer) *Server {
 	s := &Server{
-		app:    app.NewService(http.DefaultClient),
-		out:    out,
-		errOut: errOut,
+		app:        app.NewService(http.DefaultClient),
+		polymarket: polymarket.NewService("", nil),
+		out:        out,
+		errOut:     errOut,
 	}
 	s.tools = []toolDef{
 		{
@@ -99,6 +104,33 @@ func New(out, errOut io.Writer) *Server {
 					},
 				},
 				"required":             []string{"channel"},
+				"additionalProperties": false,
+			},
+		},
+		{
+			Name:        "get_polymarket_events",
+			Description: "Fetch Polymarket events/markets with optional filtering. Returns JSON feed format.",
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"endpoint": map[string]any{
+						"type":        "string",
+						"description": "API endpoint path: 'sampling-markets' (default), 'markets', or custom path like '/sampling-markets?limit=10&closed=false'.",
+						"default":     "sampling-markets",
+					},
+					"limit": map[string]any{
+						"type":        "integer",
+						"description": "Maximum number of events to return (applied as query param if endpoint doesn't already include it).",
+					},
+					"closed": map[string]any{
+						"type":        "boolean",
+						"description": "Include closed markets (true) or only active (false). Applied as query param if endpoint supports it.",
+					},
+					"active": map[string]any{
+						"type":        "boolean",
+						"description": "Filter to only active markets. Applied as query param if endpoint supports it.",
+					},
+				},
 				"additionalProperties": false,
 			},
 		},
@@ -206,6 +238,34 @@ func (s *Server) callTool(raw json.RawMessage) (any, *rpcError) {
 		status, body, _ := s.app.HandleFeedRequest(channel)
 		if status < 200 || status >= 300 {
 			return toolErr(fmt.Sprintf("feed fetch failed (status %d): %s", status, body)), nil
+		}
+		return toolResult{Content: []contentItem{{Type: "text", Text: body}}}, nil
+	case "get_polymarket_events":
+		endpoint, _ := p.Arguments["endpoint"].(string)
+		if endpoint == "" {
+			endpoint = "sampling-markets"
+		}
+
+		// Build query params if not already in endpoint
+		if !strings.Contains(endpoint, "?") {
+			params := url.Values{}
+			if limit, ok := p.Arguments["limit"].(float64); ok && limit > 0 {
+				params.Set("limit", fmt.Sprintf("%.0f", limit))
+			}
+			if closed, ok := p.Arguments["closed"].(bool); ok {
+				params.Set("closed", fmt.Sprintf("%t", closed))
+			}
+			if active, ok := p.Arguments["active"].(bool); ok {
+				params.Set("active", fmt.Sprintf("%t", active))
+			}
+			if len(params) > 0 {
+				endpoint = endpoint + "?" + params.Encode()
+			}
+		}
+
+		body, err := s.polymarket.GetJSONFeed(endpoint)
+		if err != nil {
+			return toolErr(fmt.Sprintf("polymarket fetch failed: %s", err.Error())), nil
 		}
 		return toolResult{Content: []contentItem{{Type: "text", Text: body}}}, nil
 	default:

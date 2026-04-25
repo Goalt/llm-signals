@@ -149,13 +149,53 @@ curl -s -X POST http://localhost:8000/mcp \
 
 Уведомления (запросы без `id`) возвращают `204 No Content`.
 
+### Доступные инструменты
+
 Поддерживаемые методы: `initialize`, `notifications/initialized`, `ping`,
-`tools/list`, `tools/call`. Доступные инструменты:
+`tools/list`, `tools/call`.
 
-- `get_telegram_feed` — вход `{"channel": "<username>"}`, возвращает JSON фида
-  публичного Telegram-канала (та же логика, что и у HTTP `/feed/{channel}`).
+#### 1. `get_telegram_feed`
 
-Пример конфигурации клиента (Claude Desktop / `claude_desktop_config.json`):
+Получает фид публичного Telegram-канала через `t.me/s/{channel}`.
+
+**Параметры:**
+- `channel` (string, обязательный) — имя канала без `@`.
+
+**Пример:**
+```bash
+curl -s -X POST http://localhost:8000/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"get_telegram_feed","arguments":{"channel":"durov"}}}'
+```
+
+#### 2. `get_polymarket_events`
+
+Получает события/рынки Polymarket с опциональной фильтрацией. Возвращает JSON в формате фида.
+
+**Параметры:**
+- `endpoint` (string, опциональный) — путь API-эндпоинта:
+  - `"sampling-markets"` (по умолчанию) — свежие рынки,
+  - `"markets"` — все рынки,
+  - или кастомный путь типа `"/sampling-markets?limit=10&closed=false"`.
+- `limit` (integer, опциональный) — максимальное число событий (применяется как query param, если endpoint его ещё не содержит).
+- `closed` (boolean, опциональный) — включить закрытые рынки (`true`) или только активные (`false`).
+- `active` (boolean, опциональный) — фильтровать только активные рынки.
+
+**Пример (минимальный):**
+```bash
+curl -s -X POST http://localhost:8000/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":20,"method":"tools/call","params":{"name":"get_polymarket_events","arguments":{}}}'
+```
+
+**Пример (с фильтрацией):**
+```bash
+curl -s -X POST http://localhost:8000/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":21,"method":"tools/call","params":{"name":"get_polymarket_events","arguments":{"endpoint":"sampling-markets","limit":5,"closed":false}}}'
+```
+
+### Конфигурация клиента
 
 ```json
 {

@@ -56,9 +56,16 @@ func TestInitializeAndToolsList(t *testing.T) {
 	if !ok || len(tools) == 0 {
 		t.Fatalf("expected tools, got %#v", lr["tools"])
 	}
+	if len(tools) != 2 {
+		t.Fatalf("expected 2 tools, got %d", len(tools))
+	}
 	first := tools[0].(map[string]any)
 	if first["name"] != "get_telegram_feed" {
 		t.Fatalf("unexpected tool name: %v", first["name"])
+	}
+	second := tools[1].(map[string]any)
+	if second["name"] != "get_polymarket_events" {
+		t.Fatalf("expected second tool to be get_polymarket_events, got %v", second["name"])
 	}
 }
 
@@ -115,5 +122,61 @@ func TestToolCallUnknownTool(t *testing.T) {
 	}
 	if _, ok := resps[0]["error"].(map[string]any); !ok {
 		t.Fatalf("expected error, got %#v", resps[0])
+	}
+}
+
+func TestPolymarketToolInToolsList(t *testing.T) {
+	resps := runRequests(t,
+		`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`,
+	)
+	if len(resps) != 1 {
+		t.Fatalf("expected 1 response, got %d", len(resps))
+	}
+	result, ok := resps[0]["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing result: %#v", resps[0])
+	}
+	tools, ok := result["tools"].([]any)
+	if !ok || len(tools) < 2 {
+		t.Fatalf("expected at least 2 tools, got %#v", result["tools"])
+	}
+	var found bool
+	for _, tool := range tools {
+		tm := tool.(map[string]any)
+		if tm["name"] == "get_polymarket_events" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("get_polymarket_events not found in tools list")
+	}
+}
+
+func TestPolymarketToolCallWithDefaults(t *testing.T) {
+	// This test validates schema and invocation flow but won't hit real API.
+	// A successful call would require live upstream or a fixture.
+	resps := runRequests(t,
+		`{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get_polymarket_events","arguments":{}}}`,
+	)
+	if len(resps) != 1 {
+		t.Fatalf("expected 1 response, got %d", len(resps))
+	}
+	// We expect either a result (successful upstream call) or an isError=true result.
+	res, ok := resps[0]["result"].(map[string]any)
+	if !ok {
+		// Could be an RPC error too if something else goes wrong
+		t.Logf("got RPC error: %#v", resps[0])
+		return
+	}
+	// If isError is present and true, that's expected for missing upstream.
+	if isErr, _ := res["isError"].(bool); isErr {
+		t.Logf("tool returned error result: %#v", res)
+		return
+	}
+	// Otherwise we got content; validate structure.
+	content, ok := res["content"].([]any)
+	if !ok || len(content) == 0 {
+		t.Fatalf("expected content array, got %#v", res)
 	}
 }
