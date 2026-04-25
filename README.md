@@ -62,6 +62,11 @@ x.com notifier disabled: set X_USERS and WEBHOOKS to enable
 Serving tg-channel-to-rss on http://0.0.0.0:8000
 ```
 
+### Dashboard
+
+Built-in monitoring UI is available at [`/dashboard`](http://localhost:8000/dashboard).
+It is rendered server-side and enhanced with [Datastar](https://data-star.dev/guide/getting_started), so there is no separate frontend build step. The overview now also includes Go runtime and SQLite metrics. It also includes a Stored news section for browsing SQLite rows written by Process + Analyze.
+
 ### 3. Проверьте, что фид работает
 
 ```bash

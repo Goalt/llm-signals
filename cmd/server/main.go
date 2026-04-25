@@ -68,39 +68,50 @@ func main() {
 
 	svc := app.NewService(http.DefaultClient)
 	mcpServer := mcp.New(io.Discard, os.Stderr)
-	hyperliquidProxy, err := newAPIProxy(apiProxyConfig{
-		RoutePrefix:   "/proxy/hyperliquid",
-		TargetBaseURL: envOrDefault("HYPERLIQUID_API_BASE_URL", "https://api.hyperliquid.xyz"),
-		Authorization: os.Getenv("HYPERLIQUID_AUTHORIZATION"),
-		Name:          "hyperliquid",
-	})
+	proxyConfigs := []apiProxyConfig{
+		{
+			RoutePrefix:   "/proxy/hyperliquid",
+			TargetBaseURL: envOrDefault("HYPERLIQUID_API_BASE_URL", "https://api.hyperliquid.xyz"),
+			Authorization: os.Getenv("HYPERLIQUID_AUTHORIZATION"),
+			Name:          "hyperliquid",
+		},
+		{
+			RoutePrefix:   "/proxy/polymarket",
+			TargetBaseURL: envOrDefault("POLYMARKET_API_BASE_URL", "https://clob.polymarket.com"),
+			Authorization: os.Getenv("POLYMARKET_AUTHORIZATION"),
+			Name:          "polymarket",
+		},
+		{
+			RoutePrefix:   "/proxy/bybit",
+			TargetBaseURL: envOrDefault("BYBIT_API_BASE_URL", "https://api.bybit.com"),
+			Authorization: os.Getenv("BYBIT_AUTHORIZATION"),
+			Name:          "bybit",
+		},
+	}
+	hyperliquidProxy, err := newAPIProxy(proxyConfigs[0])
 	if err != nil {
 		log.Errorf(ctx, "failed to initialize hyperliquid proxy: %v", err)
 		os.Exit(1)
 	}
-	polymarketProxy, err := newAPIProxy(apiProxyConfig{
-		RoutePrefix:   "/proxy/polymarket",
-		TargetBaseURL: envOrDefault("POLYMARKET_API_BASE_URL", "https://clob.polymarket.com"),
-		Authorization: os.Getenv("POLYMARKET_AUTHORIZATION"),
-		Name:          "polymarket",
-	})
+	polymarketProxy, err := newAPIProxy(proxyConfigs[1])
 	if err != nil {
 		log.Errorf(ctx, "failed to initialize polymarket proxy: %v", err)
 		os.Exit(1)
 	}
-	bybitProxy, err := newAPIProxy(apiProxyConfig{
-		RoutePrefix:   "/proxy/bybit",
-		TargetBaseURL: envOrDefault("BYBIT_API_BASE_URL", "https://api.bybit.com"),
-		Authorization: os.Getenv("BYBIT_AUTHORIZATION"),
-		Name:          "bybit",
-	})
+	bybitProxy, err := newAPIProxy(proxyConfigs[2])
 	if err != nil {
 		log.Errorf(ctx, "failed to initialize bybit proxy: %v", err)
 		os.Exit(1)
 	}
 	processAnalyzeHandler := newProcessAnalyzeHandler()
+	dashboardRuntime := newDashboardRuntime(os.Getenv, proxyConfigs)
+	dashboardHandler := newDashboardHandler(dashboardRuntime)
 
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := dashboardRuntime.instrument(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/dashboard" || r.URL.Path == "/dashboard/" || strings.HasPrefix(r.URL.Path, "/dashboard/") {
+			dashboardHandler.ServeHTTP(w, r)
+			return
+		}
 		if r.URL.Path == "/mcp" || strings.HasPrefix(r.URL.Path, "/mcp/") {
 			mcpServer.ServeHTTP(w, r)
 			return
@@ -134,8 +145,7 @@ func main() {
 		}
 		w.WriteHeader(status)
 		_, _ = w.Write([]byte(body))
-	})
-
+	}))
 	runCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -355,6 +365,7 @@ Subcommands:
                  (Claude Desktop, Cursor, etc.).
 
 HTTP routes:
+  GET  /dashboard        Open the built-in monitoring dashboard.
   POST /process-analyze  Run the Process + Analyze pipeline for a notifier payload.
 
 Environment variables are documented in .env.example.

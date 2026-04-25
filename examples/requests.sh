@@ -20,6 +20,18 @@ req() {
   curl -sS -o >(sed 's/^/   /') -w '   → HTTP %{http_code}\n' -X "$method" "$url" "$@" || true
 }
 
+
+dashboard() {
+  hr "dashboard: main page"
+  req GET "$HOST/dashboard"
+
+  hr "dashboard: refresh all partials"
+  req GET "$HOST/dashboard/partials/all"
+
+  hr "dashboard: runtime metrics partial"
+  req GET "$HOST/dashboard/partials/runtime"
+}
+
 feed() {
   hr "feed: happy path"
   req GET "$HOST/feed/durov"
@@ -84,15 +96,16 @@ proxy_bybit() {
   req GET "$HOST/proxy/bybit/v5/market/orderbook?category=linear&symbol=BTCUSDT&limit=25"
 }
 
-all=(feed proxy-hyperliquid proxy-polymarket proxy-bybit process-analyze)
+all=(dashboard feed proxy-hyperliquid proxy-polymarket proxy-bybit process-analyze)
 
 run() {
   case "$1" in
-    feed)             feed ;;
+    dashboard)         dashboard ;;
+    feed)              feed ;;
     proxy-hyperliquid) proxy_hyperliquid ;;
     proxy-polymarket)  proxy_polymarket ;;
     proxy-bybit)       proxy_bybit ;;
-    process-analyze)    process_analyze ;;
+    process-analyze)   process_analyze ;;
     *) echo "unknown group: $1 (available: ${all[*]})" >&2; return 2 ;;
   esac
 }

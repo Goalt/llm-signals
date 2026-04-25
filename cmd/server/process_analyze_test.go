@@ -6,6 +6,8 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -43,6 +45,20 @@ func TestProcessAnalyzeHandlerSuccess(t *testing.T) {
 	}
 	if out.Status != "processed" || out.Output == nil {
 		t.Fatalf("unexpected response: %+v", out)
+	}
+}
+
+func TestNewProcessAnalyzeHandlerInitializesSQLiteStore(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "process-analyze.db")
+	t.Setenv("PROCESS_ANALYZE_OPENROUTER_AUTHORIZATION", "Bearer test")
+	t.Setenv("PROCESS_ANALYZE_TELEGRAM_BOT_TOKEN", "123")
+	t.Setenv("PROCESS_ANALYZE_TELEGRAM_CHAT_ID", "456")
+	t.Setenv("PROCESS_ANALYZE_SQLITE_PATH", dbPath)
+
+	_ = newProcessAnalyzeHandler()
+
+	if _, err := os.Stat(dbPath); err != nil {
+		t.Fatalf("expected sqlite file to be initialized: %v", err)
 	}
 }
 

@@ -21,6 +21,16 @@ func newProcessAnalyzeHandler() http.Handler {
 	if len(missing) > 0 {
 		return disabledProcessAnalyzeHandler("process-analyze disabled: set " + strings.Join(missing, ", "))
 	}
+
+	store := cfg.NewStore()
+	if err := store.CheckAccess(context.Background()); err != nil {
+		_ = store.Close()
+		return disabledProcessAnalyzeHandler("process-analyze disabled: initialize sqlite store: " + err.Error())
+	}
+	if err := store.Close(); err != nil {
+		return disabledProcessAnalyzeHandler("process-analyze disabled: close sqlite store: " + err.Error())
+	}
+
 	return newProcessAnalyzeHandlerWithRunner(cfg.NewProcessor(http.DefaultClient))
 }
 

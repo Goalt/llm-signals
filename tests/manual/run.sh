@@ -24,6 +24,10 @@ hit() {
   } >> "$LOG"
 }
 
+hit "dashboard page"      GET  "$HOST/dashboard"
+hit "dashboard partials"  GET  "$HOST/dashboard/partials/all"
+hit "dashboard runtime"   GET  "$HOST/dashboard/partials/runtime"
+
 hit "feed missing"         GET  "$HOST/feed/"
 hit "feed short"           GET  "$HOST/feed/ab"
 hit "feed bad chars"       GET  "$HOST/feed/hello-world"
