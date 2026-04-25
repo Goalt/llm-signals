@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,6 +15,7 @@ import (
 
 	applog "github.com/Goalt/logger/logger"
 	"github.com/Goalt/tg-channel-to-rss/internal/app"
+	"github.com/Goalt/tg-channel-to-rss/internal/mcp"
 	"github.com/Goalt/tg-channel-to-rss/internal/notifier"
 	"github.com/Goalt/tg-channel-to-rss/internal/polymarket"
 	"github.com/Goalt/tg-channel-to-rss/internal/xapi"
@@ -28,6 +30,8 @@ func main() {
 		switch os.Args[1] {
 		case "test-webhook":
 			os.Exit(runTestWebhook(os.Args[2:]))
+		case "mcp":
+			os.Exit(runMCP())
 		case "serve", "server":
 			// explicit server mode; fall through to default startup
 		case "-h", "--help", "help":
@@ -63,6 +67,7 @@ func main() {
 	}
 
 	svc := app.NewService(http.DefaultClient)
+	mcpServer := mcp.New(io.Discard, os.Stderr)
 	hyperliquidProxy, err := newAPIProxy(apiProxyConfig{
 		RoutePrefix:   "/proxy/hyperliquid",
 		TargetBaseURL: envOrDefault("HYPERLIQUID_API_BASE_URL", "https://api.hyperliquid.xyz"),
@@ -95,6 +100,10 @@ func main() {
 	}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/mcp" || strings.HasPrefix(r.URL.Path, "/mcp/") {
+			mcpServer.ServeHTTP(w, r)
+			return
+		}
 		if matchesProxyRoute(r.URL.Path, "/proxy/hyperliquid") {
 			hyperliquidProxy.ServeHTTP(w, r)
 			return
@@ -336,6 +345,9 @@ Subcommands:
   serve          Run the HTTP server (default when no subcommand is given).
   test-webhook   Send a synthetic notifier payload to the configured WEBHOOKS.
                  Run "server test-webhook -h" for available flags.
+  mcp            Run the Model Context Protocol (MCP) server over stdio.
+                 Suitable for use as a sub-process by MCP clients
+                 (Claude Desktop, Cursor, etc.).
 
 Environment variables are documented in .env.example.
 `)

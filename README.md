@@ -107,6 +107,77 @@ bash tests/manual/notifier-wiring.sh
 Полный 7-слойный регресс описан в [.github/agents/api-integrator.agent.md](.github/agents/api-integrator.agent.md)
 и автоматизирован в [.github/workflows/agent-regression.yml](.github/workflows/agent-regression.yml).
 
+## MCP server
+
+В состав проекта входит минимальный [Model Context Protocol](https://modelcontextprotocol.io/)
+сервер на JSON-RPC 2.0. Поддерживаются два транспорта поверх одного и того же
+ядра:
+
+- **stdio** — для MCP-клиентов, запускающих сервер как подпроцесс
+  (Claude Desktop, Cursor и т.п.).
+- **HTTP** — единый эндпоинт `POST /mcp`, который принимает JSON-RPC запрос и
+  возвращает JSON-RPC ответ. Удобно дергать из браузера, curl или удалённого
+  клиента.
+
+### Запуск через stdio
+
+```bash
+go run ./cmd/server mcp
+```
+
+### HTTP-эндпоинт
+
+Эндпоинт `/mcp` поднимается основным HTTP-сервером (`go run ./cmd/server`)
+рядом с `/feed/...` и `/proxy/...`.
+
+```bash
+# initialize
+curl -s -X POST http://localhost:8000/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+
+# список инструментов
+curl -s -X POST http://localhost:8000/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+
+# вызов инструмента
+curl -s -X POST http://localhost:8000/mcp \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_telegram_feed","arguments":{"channel":"durov"}}}'
+```
+
+Уведомления (запросы без `id`) возвращают `204 No Content`.
+
+Поддерживаемые методы: `initialize`, `notifications/initialized`, `ping`,
+`tools/list`, `tools/call`. Доступные инструменты:
+
+- `get_telegram_feed` — вход `{"channel": "<username>"}`, возвращает JSON фида
+  публичного Telegram-канала (та же логика, что и у HTTP `/feed/{channel}`).
+
+Пример конфигурации клиента (Claude Desktop / `claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "llm-signals": {
+      "command": "go",
+      "args": ["run", "./cmd/server", "mcp"],
+      "cwd": "/абсолютный/путь/до/llm-signals"
+    }
+  }
+}
+```
+
+Быстрая проверка stdio вручную:
+
+```bash
+printf '%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+  | go run ./cmd/server mcp
+```
+
 ## Build and run with Docker
 1. Build image:
 ```bash
